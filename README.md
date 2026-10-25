@@ -7,6 +7,7 @@ An offline-first Android workout log with a built-in coach. Everything is stored
 - **Workout log:** start a session, add exercises, log each set with weight, reps and how hard it felt (1–10).
 - **Exercise library:** ~30 common gym exercises with step-by-step instructions, form tips, and easier/harder variations.
 - **Goals:** strength goals ("Bench Press 80 kg") and consistency goals ("3 workouts per week") with progress bars.
+- **6-week program:** pick 2, 3 or 4 workouts a week and a focus (strength, muscle or fitness). Weeks 1–5 build up, week 6 is a recovery week. Weights come from the coach's targets, so the plan keeps adapting.
 - **History:** every finished workout with sets, total volume and duration.
 - **Coach:** after each workout the coach reviews every exercise and sets your next target:
   - All sets done at effort 8 or lower → +2.5 kg (or +1 rep for bodyweight moves; harder variant at 15 reps).

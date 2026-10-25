@@ -36,7 +36,7 @@ import com.gymcoach.ui.formatDateTime
 import kotlinx.coroutines.launch
 
 @Composable
-fun HomeScreen(openWorkout: (Long) -> Unit, openGoals: () -> Unit) {
+fun HomeScreen(openWorkout: (Long) -> Unit, openGoals: () -> Unit, openProgram: () -> Unit) {
     val repo = LocalRepository.current
     val scope = rememberCoroutineScope()
     val active by repo.activeSession.collectAsStateWithLifecycle(initialValue = null)
@@ -45,6 +45,7 @@ fun HomeScreen(openWorkout: (Long) -> Unit, openGoals: () -> Unit) {
     val goals by repo.goals.collectAsStateWithLifecycle(initialValue = emptyList())
     val weeklyGoal = goals.firstOrNull { it.type == GoalType.WEEKLY_SESSIONS && it.achievedAt == null }
     val openGoalCount = goals.count { it.achievedAt == null }
+    val program by repo.activeProgram.collectAsStateWithLifecycle(initialValue = null)
 
     Column(Modifier.fillMaxSize()) {
         GymTopBar("Gym Coach")
@@ -73,9 +74,30 @@ fun HomeScreen(openWorkout: (Long) -> Unit, openGoals: () -> Unit) {
                         ) {
                             Icon(Icons.Filled.PlayArrow, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text(if (session != null) "Continue workout" else "Start workout")
+                            Text(if (session != null) "Continue workout" else if (program != null) "Free workout" else "Start workout")
                         }
                     }
+                }
+            }
+            item {
+                val p = program
+                if (p == null) {
+                    Card(onClick = openProgram) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                            Text("Get a 6-week program", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "The coach plans every workout for you, built from the equipment on board.",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                } else {
+                    ProgramHomeCard(
+                        program = p,
+                        hasActiveSession = active != null,
+                        onStart = { scope.launch { repo.startProgramDay()?.let(openWorkout) } },
+                        openProgram = openProgram,
+                    )
                 }
             }
             item {
@@ -122,6 +144,44 @@ fun HomeScreen(openWorkout: (Long) -> Unit, openGoals: () -> Unit) {
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgramHomeCard(
+    program: com.gymcoach.data.Program,
+    hasActiveSession: Boolean,
+    onStart: () -> Unit,
+    openProgram: () -> Unit,
+) {
+    val repo = LocalRepository.current
+    val finished by androidx.compose.runtime.remember(program.id) { repo.finishedProgramSessions(program.id) }
+        .collectAsStateWithLifecycle(initialValue = emptyList())
+    val next = repo.nextProgramDay(program, finished)
+    val total = com.gymcoach.coach.ProgramPlanner.WEEKS * program.daysPerWeek
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(
+                if (next != null) "Week ${next.week} of 6 · ${next.name}" else "Program complete!",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            if (next != null) {
+                Text(next.exercises.joinToString(", "), style = MaterialTheme.typography.bodySmall)
+            }
+            Spacer(Modifier.size(8.dp))
+            LinearProgressIndicator(
+                progress = { (finished.size.toFloat() / total).coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text("${finished.size} of $total workouts done", style = MaterialTheme.typography.labelMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (next != null && !hasActiveSession) {
+                    Button(onClick = onStart) { Text("Start today's workout") }
+                }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = openProgram) { Text("View plan") }
             }
         }
     }

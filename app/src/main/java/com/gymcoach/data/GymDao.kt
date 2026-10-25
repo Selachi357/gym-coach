@@ -145,6 +145,34 @@ interface GymDao {
     @Delete
     suspend fun deleteGoal(goal: Goal)
 
+    // Programs
+    @Query("SELECT * FROM programs WHERE active = 1 ORDER BY startedAt DESC LIMIT 1")
+    fun activeProgram(): Flow<Program?>
+
+    @Query("SELECT * FROM programs WHERE active = 1 ORDER BY startedAt DESC LIMIT 1")
+    suspend fun getActiveProgram(): Program?
+
+    @Query("UPDATE programs SET active = 0")
+    suspend fun deactivatePrograms()
+
+    @Insert
+    suspend fun insertProgram(program: Program): Long
+
+    @Query("SELECT * FROM sessions WHERE programId = :programId AND endedAt IS NOT NULL")
+    fun finishedProgramSessions(programId: Long): Flow<List<WorkoutSession>>
+
+    @Query("SELECT * FROM sessions WHERE programId = :programId AND endedAt IS NOT NULL")
+    suspend fun getFinishedProgramSessions(programId: Long): List<WorkoutSession>
+
+    @Query("SELECT * FROM session_exercises WHERE sessionId = :sessionId ORDER BY position")
+    fun sessionPlans(sessionId: Long): Flow<List<SessionExercise>>
+
+    @Query("SELECT * FROM session_exercises WHERE sessionId = :sessionId ORDER BY position")
+    suspend fun sessionPlansOnce(sessionId: Long): List<SessionExercise>
+
+    @Update
+    suspend fun updateSessionExercise(se: SessionExercise)
+
     // Coach notes
     @Query("SELECT * FROM coach_notes ORDER BY createdAt DESC, id DESC LIMIT :limit")
     fun coachNotes(limit: Int): Flow<List<CoachNote>>

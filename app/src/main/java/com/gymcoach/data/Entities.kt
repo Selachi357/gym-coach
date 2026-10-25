@@ -41,6 +41,10 @@ data class WorkoutSession(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val startedAt: Long,
     val endedAt: Long? = null,
+    /** Set when this workout is a day of a 6-week program. */
+    val programId: Long? = null,
+    val programWeek: Int? = null,
+    val programDay: Int? = null,
 )
 
 /** An exercise added to a session, in display order. */
@@ -54,6 +58,10 @@ data class SessionExercise(
     val sessionId: Long,
     val exerciseId: Long,
     val position: Int,
+    /** Program workouts store this week's target; null means use the coach's base target. */
+    val plannedSets: Int? = null,
+    val plannedReps: Int? = null,
+    val plannedWeightKg: Double? = null,
 )
 
 @Entity(
@@ -74,6 +82,16 @@ data class SetEntry(
     /** Cardio only. */
     val distanceKm: Double = 0.0,
     val createdAt: Long,
+)
+
+@Entity(tableName = "programs")
+data class Program(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val startedAt: Long,
+    val daysPerWeek: Int,
+    /** A [com.gymcoach.coach.ProgramFocus] name. */
+    val focus: String,
+    val active: Boolean,
 )
 
 enum class GoalType { STRENGTH, WEEKLY_SESSIONS }

@@ -43,7 +43,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.gymcoach.coach.ProgramFocus
+import com.gymcoach.coach.ProgramPlanner
 import com.gymcoach.coach.effortLabel
+import com.gymcoach.data.withPlan
 import com.gymcoach.coach.formatKg
 import com.gymcoach.data.Exercise
 import com.gymcoach.data.ExerciseTarget
@@ -68,6 +71,17 @@ fun WorkoutScreen(
     val sets by repo.setsForSession(sessionId).collectAsStateWithLifecycle(initialValue = emptyList())
     val targets by repo.targets.collectAsStateWithLifecycle(initialValue = emptyList())
     val targetMap = targets.associateBy { it.exerciseId }
+    val plans by repo.sessionPlans(sessionId).collectAsStateWithLifecycle(initialValue = emptyList())
+    val planMap = plans.associateBy { it.exerciseId }
+    val session by repo.session(sessionId).collectAsStateWithLifecycle(initialValue = null)
+    val program by repo.activeProgram.collectAsStateWithLifecycle(initialValue = null)
+    val week = session?.programWeek
+    val dayPlan = session?.let { s ->
+        program?.takeIf { it.id == s.programId }?.let { p ->
+            ProgramPlanner.plan(p.daysPerWeek).firstOrNull { it.week == s.programWeek && it.day == s.programDay }
+        }
+    }
+    val focus = program?.let { p -> ProgramFocus.entries.firstOrNull { it.name == p.focus } }
 
     var coachMessages by remember { mutableStateOf<List<String>?>(null) }
     var closeAfterMessages by remember { mutableStateOf(false) }
@@ -75,7 +89,7 @@ fun WorkoutScreen(
 
     Column(Modifier.fillMaxSize()) {
         GymTopBar(
-            title = "Workout",
+            title = dayPlan?.let { "Week ${it.week} · ${it.name}" } ?: "Workout",
             back = close,
             actions = {
                 TextButton(onClick = {
@@ -91,6 +105,15 @@ fun WorkoutScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (week != null && focus != null) {
+                item {
+                    Text(
+                        ProgramPlanner.scheme(focus, week).note,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+            }
             if (exercises.isEmpty()) {
                 item {
                     Text(
@@ -103,7 +126,9 @@ fun WorkoutScreen(
             items(exercises, key = { it.id }) { exercise ->
                 ExerciseCard(
                     exercise = exercise,
-                    target = targetMap[exercise.id] ?: repo.defaultTarget(exercise),
+                    target = (targetMap[exercise.id] ?: repo.defaultTarget(exercise)).let { base ->
+                        planMap[exercise.id]?.let { base.withPlan(it) } ?: base
+                    },
                     sets = sets.filter { it.exerciseId == exercise.id },
                     onLog = { weight, reps, effort, distance ->
                         scope.launch { repo.logSet(sessionId, exercise.id, weight, reps, effort, distance) }

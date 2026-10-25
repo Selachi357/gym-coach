@@ -127,7 +127,7 @@ object Coach {
             return CoachDecision(
                 CoachAction.DELOAD,
                 current.copy(weightKg = dropped),
-                message = "${exercise.name}: $reason, so weight goes down to ${formatKg(dropped)} kg. " +
+                message = "${exercise.name}: $reason, so the weight goes down ${formatKg(current.weightKg - dropped)} kg. " +
                     "Build back up with good form.",
             )
         }
@@ -193,7 +193,7 @@ object Coach {
         return CoachDecision(
             CoachAction.PROGRESS,
             current.copy(weightKg = newWeight),
-            message = "${exercise.name}: all sets done with reps to spare. Next time: ${formatKg(newWeight)} kg.",
+            message = "${exercise.name}: all sets done with reps to spare. Adding ${formatKg(WEIGHT_STEP_KG)} kg next time.",
         )
     }
 

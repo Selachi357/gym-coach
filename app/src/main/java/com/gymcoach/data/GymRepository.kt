@@ -6,6 +6,9 @@ import com.gymcoach.coach.CoachDecision
 import com.gymcoach.coach.ExerciseInfo
 import com.gymcoach.coach.LoggedSet
 import com.gymcoach.coach.Prescription
+import com.gymcoach.coach.ProgramDayPlan
+import com.gymcoach.coach.ProgramFocus
+import com.gymcoach.coach.ProgramPlanner
 import com.gymcoach.coach.formatKg
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -29,10 +32,15 @@ class GymRepository(private val db: GymDatabase) {
     fun setsForSession(sessionId: Long): Flow<List<SetEntry>> = dao.setsForSession(sessionId)
     fun setsForExercise(exerciseId: Long): Flow<List<SetEntry>> = dao.setsForExercise(exerciseId)
     fun sessionsThisWeek(): Flow<Int> = dao.finishedSessionsSince(startOfWeek())
+    fun sessionPlans(sessionId: Long): Flow<List<SessionExercise>> = dao.sessionPlans(sessionId)
+    val activeProgram: Flow<Program?> = dao.activeProgram()
+    fun finishedProgramSessions(programId: Long): Flow<List<WorkoutSession>> = dao.finishedProgramSessions(programId)
 
     suspend fun seedIfEmpty() {
-        if (dao.exerciseCount() == 0) {
-            dao.insertExercises(SeedExercises.all)
+        val firstRun = dao.exerciseCount() == 0
+        // Always insert: existing names are ignored, so app updates add new library exercises.
+        dao.insertExercises(SeedExercises.all)
+        if (firstRun) {
             dao.insertCoachNote(
                 CoachNote(
                     message = "Welcome! Start a workout, add exercises, and log each set with how hard it felt. " +
@@ -56,7 +64,7 @@ class GymRepository(private val db: GymDatabase) {
     }
 
     suspend fun logSet(sessionId: Long, exerciseId: Long, weightKg: Double, reps: Int, effort: Int, distanceKm: Double = 0.0) {
-        val target = targetFor(exerciseId)
+        val target = currentTarget(sessionId, exerciseId)
         dao.insertSet(
             SetEntry(
                 sessionId = sessionId,
@@ -88,6 +96,13 @@ class GymRepository(private val db: GymDatabase) {
         )
     }
 
+    /** Today's target: the program's planned target when this is a program workout, else the coach's base. */
+    suspend fun currentTarget(sessionId: Long, exerciseId: Long): ExerciseTarget {
+        val base = targetFor(exerciseId)
+        val plan = dao.getSessionExercise(sessionId, exerciseId) ?: return base
+        return base.withPlan(plan)
+    }
+
     fun defaultTarget(exercise: Exercise) = ExerciseTarget(
         exerciseId = exercise.id,
         weightKg = exercise.startWeightKg,
@@ -104,6 +119,7 @@ class GymRepository(private val db: GymDatabase) {
         val ex = dao.getExercise(exerciseId) ?: return "Exercise not found."
         val decision = Coach.tooHard(ex.toInfo(), targetFor(exerciseId).toPrescription())
         applyDecision(ex, decision, sessionId)
+        refreshPlans(sessionId)
         return decision.message
     }
 
@@ -118,18 +134,105 @@ class GymRepository(private val db: GymDatabase) {
         dao.updateSession(session.copy(endedAt = System.currentTimeMillis()))
 
         val messages = mutableListOf<String>()
-        for (exerciseId in sets.map { it.exerciseId }.distinct()) {
-            val ex = dao.getExercise(exerciseId) ?: continue
-            val recent = dao.recentSetsForExercise(exerciseId, limit = 2)
-                .groupBy { it.sessionId }
-                .values
-                .map { group -> group.map { LoggedSet(it.weightKg, it.reps, it.targetReps, it.effort) } }
-            val decision = Coach.evaluate(ex.toInfo(), targetFor(exerciseId).toPrescription(), recent)
-            applyDecision(ex, decision, sessionId = null)
-            messages += decision.message
+        if (session.programWeek == ProgramPlanner.DELOAD_WEEK) {
+            messages += "Deload week: your targets stay the same so your body can recover."
+        } else {
+            for (exerciseId in sets.map { it.exerciseId }.distinct()) {
+                val ex = dao.getExercise(exerciseId) ?: continue
+                val recent = dao.recentSetsForExercise(exerciseId, limit = 2)
+                    .groupBy { it.sessionId }
+                    .values
+                    .map { group -> group.map { LoggedSet(it.weightKg, it.reps, it.targetReps, it.effort) } }
+                val base = targetFor(exerciseId)
+                val today = currentTarget(sessionId, exerciseId)
+                val decision = Coach.evaluate(ex.toInfo(), today.toPrescription(), recent)
+                // In a program the coach judges today's target and moves the base target by the same step.
+                val p = decision.prescription
+                val adjusted = decision.copy(
+                    prescription = Prescription(
+                        weightKg = maxOf(0.0, base.weightKg + (p.weightKg - today.weightKg)),
+                        reps = maxOf(1, base.reps + (p.reps - today.reps)),
+                        sets = maxOf(1, base.sets + (p.sets - today.sets)),
+                    )
+                )
+                applyDecision(ex, adjusted, sessionId = null)
+                messages += decision.message
+            }
         }
+        messages += programProgress(session)
         messages += checkGoals()
         return messages
+    }
+
+    // Programs
+
+    suspend fun startProgram(daysPerWeek: Int, focus: ProgramFocus) {
+        dao.deactivatePrograms()
+        dao.insertProgram(Program(startedAt = System.currentTimeMillis(), daysPerWeek = daysPerWeek, focus = focus.name, active = true))
+        dao.insertCoachNote(
+            CoachNote(
+                message = "Your 6-week ${focus.label.lowercase()} program is ready: $daysPerWeek workouts a week. " +
+                    "Weeks 1 to 5 build up, week 6 is an easy recovery week.",
+                createdAt = System.currentTimeMillis(),
+            )
+        )
+    }
+
+    suspend fun endProgram() = dao.deactivatePrograms()
+
+    /** The next program workout to do, or null when the program is finished. */
+    fun nextProgramDay(program: Program, finished: List<WorkoutSession>): ProgramDayPlan? {
+        val done = finished.mapNotNull { s -> s.programWeek?.let { w -> s.programDay?.let { d -> w to d } } }.toSet()
+        return ProgramPlanner.plan(program.daysPerWeek).firstOrNull { (it.week to it.day) !in done }
+    }
+
+    /** Starts the next program workout with its exercises and this week's targets. Returns the session id. */
+    suspend fun startProgramDay(): Long? {
+        val program = dao.getActiveProgram() ?: return null
+        val day = nextProgramDay(program, dao.getFinishedProgramSessions(program.id)) ?: return null
+        val sessionId = dao.insertSession(
+            WorkoutSession(
+                startedAt = System.currentTimeMillis(),
+                programId = program.id,
+                programWeek = day.week,
+                programDay = day.day,
+            )
+        )
+        day.exercises.forEachIndexed { i, name ->
+            val ex = dao.getExerciseByName(name) ?: return@forEachIndexed
+            dao.insertSessionExercise(SessionExercise(sessionId, ex.id, i))
+        }
+        refreshPlans(sessionId)
+        return sessionId
+    }
+
+    /** Recomputes the planned targets of a program workout from the coach's current base targets. */
+    private suspend fun refreshPlans(sessionId: Long) {
+        val session = dao.getSession(sessionId) ?: return
+        val week = session.programWeek ?: return
+        val program = dao.getActiveProgram()?.takeIf { it.id == session.programId } ?: return
+        val focus = runCatching { ProgramFocus.valueOf(program.focus) }.getOrDefault(ProgramFocus.MUSCLE)
+        dao.sessionPlansOnce(sessionId).forEach { se ->
+            val ex = dao.getExercise(se.exerciseId) ?: return@forEach
+            val planned = ProgramPlanner.planned(focus, week, ex.isBodyweight, ex.isCardio, targetFor(ex.id).toPrescription())
+            dao.updateSessionExercise(
+                se.copy(plannedSets = planned.sets, plannedReps = planned.reps, plannedWeightKg = planned.weightKg)
+            )
+        }
+    }
+
+    private suspend fun programProgress(session: WorkoutSession): List<String> {
+        val programId = session.programId ?: return emptyList()
+        val program = dao.getActiveProgram()?.takeIf { it.id == programId } ?: return emptyList()
+        val next = nextProgramDay(program, dao.getFinishedProgramSessions(programId))
+        return when {
+            next == null -> {
+                dao.deactivatePrograms()
+                listOf("You finished your 6-week program! Start a new one to keep progressing; it will use your new weights.")
+            }
+            next.week != session.programWeek -> listOf("Week ${session.programWeek} done. Next up: week ${next.week}.")
+            else -> emptyList()
+        }
     }
 
     private suspend fun applyDecision(ex: Exercise, decision: CoachDecision, sessionId: Long?) {
@@ -205,3 +308,10 @@ class GymRepository(private val db: GymDatabase) {
 fun Exercise.toInfo() = ExerciseInfo(name, isBodyweight, easierName, harderName, isCardio)
 
 fun ExerciseTarget.toPrescription() = Prescription(weightKg, reps, sets)
+
+/** The base target with a program workout's planned values on top, where set. */
+fun ExerciseTarget.withPlan(plan: SessionExercise) = copy(
+    weightKg = plan.plannedWeightKg ?: weightKg,
+    reps = plan.plannedReps ?: reps,
+    sets = plan.plannedSets ?: sets,
+)

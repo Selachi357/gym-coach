@@ -33,6 +33,7 @@ import com.gymcoach.ui.goals.GoalsScreen
 import com.gymcoach.ui.history.HistoryScreen
 import com.gymcoach.ui.history.SessionDetailScreen
 import com.gymcoach.ui.home.HomeScreen
+import com.gymcoach.ui.program.ProgramScreen
 import com.gymcoach.ui.workout.ExercisePickerScreen
 import com.gymcoach.ui.workout.WorkoutScreen
 
@@ -83,8 +84,10 @@ fun GymCoachRoot() {
                 HomeScreen(
                     openWorkout = { nav.navigate(Routes.workout(it)) },
                     openGoals = { nav.navigateTab("goals") },
+                    openProgram = { nav.navigate("program") },
                 )
             }
+            composable("program") { ProgramScreen(back = { nav.popBackStack() }) }
             composable("exercises") {
                 ExercisesScreen(openExercise = { nav.navigate(Routes.exercise(it)) })
             }
