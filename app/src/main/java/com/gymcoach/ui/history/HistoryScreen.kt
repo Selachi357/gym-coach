@@ -18,7 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymcoach.coach.effortLabel
-import com.gymcoach.coach.formatKg
+import com.gymcoach.ui.describeSet
 import com.gymcoach.ui.GymTopBar
 import com.gymcoach.ui.LocalRepository
 import com.gymcoach.ui.formatDateTime
@@ -60,7 +60,7 @@ fun SessionDetailScreen(sessionId: Long, back: () -> Unit) {
     val session by repo.session(sessionId).collectAsStateWithLifecycle(initialValue = null)
     val sets by repo.setsForSession(sessionId).collectAsStateWithLifecycle(initialValue = emptyList())
     val exercises by repo.exercises.collectAsStateWithLifecycle(initialValue = emptyList())
-    val names = exercises.associate { it.id to it.name }
+    val byId = exercises.associateBy { it.id }
 
     Column(Modifier.fillMaxSize()) {
         GymTopBar(session?.let { formatDateTime(it.startedAt) } ?: "Workout", back = back)
@@ -72,11 +72,11 @@ fun SessionDetailScreen(sessionId: Long, back: () -> Unit) {
             items(grouped.keys.toList()) { exId ->
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text(names[exId] ?: "Exercise", style = MaterialTheme.typography.titleMedium)
+                        val ex = byId[exId]
+                        Text(ex?.name ?: "Exercise", style = MaterialTheme.typography.titleMedium)
                         grouped.getValue(exId).forEachIndexed { i, set ->
-                            val load = if (set.weightKg > 0) "${formatKg(set.weightKg)} kg × " else ""
                             Text(
-                                "Set ${i + 1}: $load${set.reps} reps · ${effortLabel(set.effort)}",
+                                "${if (ex?.isCardio == true) "Bout" else "Set"} ${i + 1}: ${describeSet(ex, set)} · ${effortLabel(set.effort)}",
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }

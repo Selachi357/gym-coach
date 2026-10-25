@@ -60,4 +60,27 @@ class CoachTest {
         assertEquals(CoachAction.REDUCE_REPS, d.action)
         assertEquals(6, d.prescription.reps)
     }
+
+    private val run = ExerciseInfo("Treadmill Run", isBodyweight = true, easierName = null, harderName = null, isCardio = true)
+
+    @Test
+    fun easyCardioAddsFiveMinutes() {
+        val d = Coach.evaluate(run, Prescription(0.0, 20, 1), listOf(listOf(LoggedSet(0.0, 20, 20, 6))))
+        assertEquals(CoachAction.PROGRESS, d.action)
+        assertEquals(25, d.prescription.reps)
+    }
+
+    @Test
+    fun tooHardCardioCutsTime() {
+        val d = Coach.tooHard(run, Prescription(0.0, 30, 1))
+        assertEquals(CoachAction.REDUCE_REPS, d.action)
+        assertEquals(25, d.prescription.reps)
+    }
+
+    @Test
+    fun cardioNeverDropsBelowTenMinutes() {
+        val d = Coach.tooHard(run, Prescription(0.0, 10, 1))
+        assertEquals(CoachAction.HOLD, d.action)
+        assertEquals(10, d.prescription.reps)
+    }
 }

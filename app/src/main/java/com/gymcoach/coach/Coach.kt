@@ -23,6 +23,8 @@ data class ExerciseInfo(
     val isBodyweight: Boolean,
     val easierName: String?,
     val harderName: String?,
+    /** Cardio uses [Prescription.reps] and [LoggedSet.reps] as minutes. */
+    val isCardio: Boolean = false,
 )
 
 enum class CoachAction { PROGRESS, HOLD, DELOAD, REDUCE_REPS, SWITCH_EASIER, SWITCH_HARDER }
@@ -45,6 +47,9 @@ data class CoachDecision(
  * - Hitting every set with effort 8 or less moves you up: +2.5 kg for weighted lifts,
  *   +1 rep for bodyweight moves, and a harder variant once bodyweight reps reach [MAX_BODYWEIGHT_REPS].
  * - Anything else: keep the same target and build consistency.
+ *
+ * Cardio (run, row, bike) works in minutes: an easy session (effort 7 or less) adds 5 minutes up to
+ * [MAX_CARDIO_MIN], and struggling cuts the time by ~20%.
  */
 object Coach {
     const val WEIGHT_STEP_KG = 2.5
@@ -52,6 +57,10 @@ object Coach {
     const val MIN_REPS = 3
     const val EASY_EFFORT = 8
     const val HARD_EFFORT = 9.0
+    const val EASY_CARDIO_EFFORT = 7
+    const val CARDIO_STEP_MIN = 5
+    const val MIN_CARDIO_MIN = 10
+    const val MAX_CARDIO_MIN = 60
 
     fun isStruggle(sets: List<LoggedSet>): Boolean {
         if (sets.isEmpty()) return false
@@ -60,9 +69,10 @@ object Coach {
         return missedReps || avgEffort >= HARD_EFFORT
     }
 
-    fun isEasyWin(sets: List<LoggedSet>, current: Prescription): Boolean {
+    fun isEasyWin(sets: List<LoggedSet>, current: Prescription, cardio: Boolean = false): Boolean {
         if (sets.size < current.sets) return false
-        return sets.all { it.reps >= it.targetReps && it.effort <= EASY_EFFORT }
+        val easy = if (cardio) EASY_CARDIO_EFFORT else EASY_EFFORT
+        return sets.all { it.reps >= it.targetReps && it.effort <= easy }
     }
 
     /**
@@ -82,7 +92,7 @@ object Coach {
         if (isStruggle(last) && isStruggle(previous)) {
             return makeEasier(exercise, current, reason = "it was tough two sessions in a row")
         }
-        if (isEasyWin(last, current)) {
+        if (isEasyWin(last, current, exercise.isCardio)) {
             return makeHarder(exercise, current)
         }
         val msg = if (isStruggle(last)) {
@@ -98,6 +108,19 @@ object Coach {
         makeEasier(exercise, current, reason = "you said it's too hard")
 
     private fun makeEasier(exercise: ExerciseInfo, current: Prescription, reason: String): CoachDecision {
+        if (exercise.isCardio) {
+            val minutes = max(MIN_CARDIO_MIN, roundToStep(current.reps * 0.8, CARDIO_STEP_MIN))
+            val tip = "Slow down so you can still talk in short sentences."
+            return if (minutes < current.reps) {
+                CoachDecision(
+                    CoachAction.REDUCE_REPS,
+                    current.copy(reps = minutes),
+                    message = "${exercise.name}: $reason, so aim for $minutes minutes. $tip",
+                )
+            } else {
+                CoachDecision(CoachAction.HOLD, current, message = "${exercise.name}: $reason. Keep $minutes minutes but lower the speed or resistance. $tip")
+            }
+        }
         if (!exercise.isBodyweight && current.weightKg > WEIGHT_STEP_KG) {
             val newWeight = max(WEIGHT_STEP_KG, roundToStep(current.weightKg * 0.9))
             val dropped = if (newWeight < current.weightKg) newWeight else current.weightKg - WEIGHT_STEP_KG
@@ -134,6 +157,22 @@ object Coach {
     }
 
     private fun makeHarder(exercise: ExerciseInfo, current: Prescription): CoachDecision {
+        if (exercise.isCardio) {
+            if (current.reps >= MAX_CARDIO_MIN) {
+                return CoachDecision(
+                    CoachAction.HOLD,
+                    current,
+                    message = "${exercise.name}: strong endurance! Keep $MAX_CARDIO_MIN minutes and try to cover more distance, " +
+                        "or add intervals: 1 minute fast, 2 minutes easy.",
+                )
+            }
+            val minutes = minOf(MAX_CARDIO_MIN, current.reps + CARDIO_STEP_MIN)
+            return CoachDecision(
+                CoachAction.PROGRESS,
+                current.copy(reps = minutes),
+                message = "${exercise.name}: that felt comfortable. Go for $minutes minutes next time.",
+            )
+        }
         if (exercise.isBodyweight) {
             if (current.reps >= MAX_BODYWEIGHT_REPS && exercise.harderName != null) {
                 return CoachDecision(
@@ -159,6 +198,8 @@ object Coach {
     }
 
     fun roundToStep(kg: Double): Double = (kg / WEIGHT_STEP_KG).roundToInt() * WEIGHT_STEP_KG
+
+    private fun roundToStep(value: Double, step: Int): Int = (value / step).roundToInt() * step
 }
 
 fun formatKg(kg: Double): String =

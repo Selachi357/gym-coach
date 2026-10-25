@@ -19,10 +19,14 @@ data class Exercise(
     val easierName: String? = null,
     val harderName: String? = null,
     val startWeightKg: Double = 0.0,
+    /** Reps per set, or minutes for cardio. */
     val startReps: Int = 8,
+    val startSets: Int = 3,
+    /** Cardio exercises log minutes (in the reps column) and distance instead of weight. */
+    val isCardio: Boolean = false,
 )
 
-/** The coach's current target for an exercise. */
+/** The coach's current target for an exercise. For cardio, [reps] is minutes and [sets] is 1. */
 @Entity(tableName = "targets")
 data class ExerciseTarget(
     @PrimaryKey val exerciseId: Long,
@@ -62,10 +66,13 @@ data class SetEntry(
     val sessionId: Long,
     val exerciseId: Long,
     val weightKg: Double,
+    /** Reps, or minutes for cardio. */
     val reps: Int,
     val targetReps: Int,
     /** 1 = very easy, 10 = could not do another rep. */
     val effort: Int,
+    /** Cardio only. */
+    val distanceKm: Double = 0.0,
     val createdAt: Long,
 )
 

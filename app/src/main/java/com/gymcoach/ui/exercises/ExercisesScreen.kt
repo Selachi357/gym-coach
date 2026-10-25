@@ -36,6 +36,7 @@ import com.gymcoach.coach.formatKg
 import com.gymcoach.data.Exercise
 import com.gymcoach.ui.GymTopBar
 import com.gymcoach.ui.LocalRepository
+import com.gymcoach.ui.describeSet
 import com.gymcoach.ui.formatDate
 import com.gymcoach.ui.formatTarget
 
@@ -117,7 +118,7 @@ fun ExerciseDetailScreen(exerciseId: Long, openExercise: (Long) -> Unit, back: (
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                 Column(Modifier.fillMaxWidth().padding(16.dp)) {
                     Text("Your coach target", style = MaterialTheme.typography.labelLarge)
-                    Text(formatTarget(target.sets, target.reps, target.weightKg), style = MaterialTheme.typography.headlineSmall)
+                    Text(formatTarget(target.sets, target.reps, target.weightKg, ex.isCardio), style = MaterialTheme.typography.headlineSmall)
                 }
             }
 
@@ -152,8 +153,12 @@ fun ExerciseDetailScreen(exerciseId: Long, openExercise: (Long) -> Unit, back: (
                     Spacer(Modifier.size(4.dp))
                     history.groupBy { it.sessionId }.values.take(10).forEach { sessionSets ->
                         val first = sessionSets.minBy { it.createdAt }
-                        val summary = sessionSets.sortedBy { it.createdAt }.joinToString("  ") { s ->
-                            if (s.weightKg > 0) "${formatKg(s.weightKg)}×${s.reps}" else "${s.reps}"
+                        val summary = sessionSets.sortedBy { it.createdAt }.joinToString(", ") { s ->
+                            when {
+                                ex.isCardio -> describeSet(ex, s)
+                                s.weightKg > 0 -> "${formatKg(s.weightKg)}×${s.reps}"
+                                else -> "${s.reps}"
+                            }
                         }
                         val avgEffort = sessionSets.map { it.effort }.average().toInt()
                         Text(

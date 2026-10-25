@@ -43,6 +43,37 @@ fun formatDuration(startMillis: Long, endMillis: Long): String {
     return if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m" else "${minutes}m"
 }
 
-/** "3 × 8 @ 60 kg" or "3 × 12" for bodyweight. */
-fun formatTarget(sets: Int, reps: Int, weightKg: Double): String =
-    if (weightKg > 0) "$sets × $reps @ ${com.gymcoach.coach.formatKg(weightKg)} kg" else "$sets × $reps"
+/** "3 × 8 @ 60 kg", "3 × 12" for bodyweight, or "30 min" for cardio. */
+fun formatTarget(sets: Int, reps: Int, weightKg: Double, cardio: Boolean = false): String = when {
+    cardio -> "$reps min"
+    weightKg > 0 -> "$sets × $reps @ ${com.gymcoach.coach.formatKg(weightKg)} kg"
+    else -> "$sets × $reps"
+}
+
+/** Pace in the units each machine shows: min/km for running, /500 m for rowing, km/h for cycling. */
+fun formatPace(exerciseName: String, minutes: Int, distanceKm: Double): String? {
+    if (minutes <= 0 || distanceKm <= 0) return null
+    fun minSec(totalMin: Double): String {
+        val secs = (totalMin * 60).toInt()
+        return "%d:%02d".format(secs / 60, secs % 60)
+    }
+    return when {
+        exerciseName.contains("Row", ignoreCase = true) -> "${minSec(minutes / (distanceKm * 2))} /500 m"
+        exerciseName.contains("Bike", ignoreCase = true) -> "%.1f km/h".format(distanceKm / (minutes / 60.0))
+        else -> "${minSec(minutes / distanceKm)} /km"
+    }
+}
+
+fun formatKm(km: Double): String = "%.2f km".format(km)
+
+/** "60 kg × 8 reps", "12 reps", or for cardio "25 min · 4.20 km · 5:57 /km". */
+fun describeSet(exercise: com.gymcoach.data.Exercise?, set: com.gymcoach.data.SetEntry): String {
+    if (exercise?.isCardio == true) {
+        val parts = mutableListOf("${set.reps} min")
+        if (set.distanceKm > 0) parts += formatKm(set.distanceKm)
+        formatPace(exercise.name, set.reps, set.distanceKm)?.let { parts += it }
+        return parts.joinToString(" · ")
+    }
+    val load = if (set.weightKg > 0) "${com.gymcoach.coach.formatKg(set.weightKg)} kg × " else ""
+    return "$load${set.reps} reps"
+}

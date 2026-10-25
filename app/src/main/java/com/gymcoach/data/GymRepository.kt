@@ -55,7 +55,7 @@ class GymRepository(private val db: GymDatabase) {
         dao.getSessionExercise(sessionId, exerciseId)?.let { dao.deleteSessionExercise(it) }
     }
 
-    suspend fun logSet(sessionId: Long, exerciseId: Long, weightKg: Double, reps: Int, effort: Int) {
+    suspend fun logSet(sessionId: Long, exerciseId: Long, weightKg: Double, reps: Int, effort: Int, distanceKm: Double = 0.0) {
         val target = targetFor(exerciseId)
         dao.insertSet(
             SetEntry(
@@ -65,6 +65,7 @@ class GymRepository(private val db: GymDatabase) {
                 reps = reps,
                 targetReps = target.reps,
                 effort = effort,
+                distanceKm = distanceKm,
                 createdAt = System.currentTimeMillis(),
             )
         )
@@ -82,7 +83,7 @@ class GymRepository(private val db: GymDatabase) {
             exerciseId = exerciseId,
             weightKg = ex?.startWeightKg ?: 0.0,
             reps = ex?.startReps ?: 8,
-            sets = 3,
+            sets = ex?.startSets ?: 3,
             updatedAt = System.currentTimeMillis(),
         )
     }
@@ -91,7 +92,7 @@ class GymRepository(private val db: GymDatabase) {
         exerciseId = exercise.id,
         weightKg = exercise.startWeightKg,
         reps = exercise.startReps,
-        sets = 3,
+        sets = exercise.startSets,
         updatedAt = 0,
     )
 
@@ -201,6 +202,6 @@ class GymRepository(private val db: GymDatabase) {
     }
 }
 
-fun Exercise.toInfo() = ExerciseInfo(name, isBodyweight, easierName, harderName)
+fun Exercise.toInfo() = ExerciseInfo(name, isBodyweight, easierName, harderName, isCardio)
 
 fun ExerciseTarget.toPrescription() = Prescription(weightKg, reps, sets)

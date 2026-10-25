@@ -92,34 +92,6 @@ object SeedExercises {
 
         // Back
         Exercise(
-            name = "Pull-Up", muscleGroup = "Back", equipment = "Pull-up bar", isBodyweight = true,
-            instructions = """
-                Hang from the bar with hands a bit wider than your shoulders, palms facing away.
-                Pull your shoulder blades down, then pull your chest towards the bar.
-                Get your chin over the bar.
-                Lower yourself all the way down under control.
-            """.trimIndent(),
-            tips = """
-                No swinging or kicking.
-                Think about pulling your elbows down to your ribs.
-            """.trimIndent(),
-            easierName = "Lat Pulldown", startReps = 5,
-        ),
-        Exercise(
-            name = "Lat Pulldown", muscleGroup = "Back", equipment = "Cable machine", isBodyweight = false,
-            instructions = """
-                Sit with your thighs under the pads and grab the bar wider than your shoulders.
-                Lean back slightly and pull the bar to your upper chest.
-                Squeeze your shoulder blades together at the bottom.
-                Let the bar rise slowly until your arms are straight.
-            """.trimIndent(),
-            tips = """
-                Don't pull the bar behind your neck.
-                Don't use your body weight to yank the bar down.
-            """.trimIndent(),
-            harderName = "Pull-Up", startWeightKg = 30.0,
-        ),
-        Exercise(
             name = "Barbell Row", muscleGroup = "Back", equipment = "Barbell", isBodyweight = false,
             instructions = """
                 Hold the bar with hands shoulder-width apart.
@@ -131,21 +103,7 @@ object SeedExercises {
                 Keep your back flat, never rounded.
                 If your torso bounces up and down, the weight is too heavy.
             """.trimIndent(),
-            easierName = "Seated Cable Row", startWeightKg = 30.0,
-        ),
-        Exercise(
-            name = "Seated Cable Row", muscleGroup = "Back", equipment = "Cable machine", isBodyweight = false,
-            instructions = """
-                Sit with your feet on the platform and knees slightly bent.
-                Grab the handle with straight arms and sit tall.
-                Pull the handle to your belly, squeezing your shoulder blades together.
-                Let your arms straighten slowly.
-            """.trimIndent(),
-            tips = """
-                Don't rock your torso back and forth.
-                Keep your shoulders down, away from your ears.
-            """.trimIndent(),
-            harderName = "Barbell Row", startWeightKg = 30.0,
+            easierName = "One-Arm Dumbbell Row", startWeightKg = 30.0,
         ),
         Exercise(
             name = "One-Arm Dumbbell Row", muscleGroup = "Back", equipment = "Dumbbells", isBodyweight = false,
@@ -159,7 +117,21 @@ object SeedExercises {
                 Keep your back flat and parallel to the floor.
                 Pull with your elbow, not your hand.
             """.trimIndent(),
-            startWeightKg = 12.0,
+            harderName = "Barbell Row", startWeightKg = 12.0,
+        ),
+        Exercise(
+            name = "Dumbbell Pullover", muscleGroup = "Back", equipment = "Dumbbell + bench", isBodyweight = false,
+            instructions = """
+                Lie across or along the bench holding one dumbbell with both hands above your chest.
+                Keep a slight bend in your elbows.
+                Lower the dumbbell back over your head in an arc until you feel a stretch in your lats and chest.
+                Pull it back over your chest using your lats.
+            """.trimIndent(),
+            tips = """
+                Keep your elbow angle the same the whole time.
+                Go only as far back as your shoulders feel comfortable.
+            """.trimIndent(),
+            startWeightKg = 10.0, startReps = 10,
         ),
 
         // Legs
@@ -280,9 +252,10 @@ object SeedExercises {
             easierName = "Bodyweight Squat", startWeightKg = 6.0, startReps = 10,
         ),
         Exercise(
-            name = "Calf Raise", muscleGroup = "Legs", equipment = "Machine or dumbbells", isBodyweight = false,
+            name = "Calf Raise", muscleGroup = "Legs", equipment = "Leg press or dumbbells", isBodyweight = false,
             instructions = """
-                Stand with the balls of your feet on a step or platform.
+                On the leg press: put the balls of your feet on the bottom edge of the platform, legs straight.
+                With dumbbells: stand with the balls of your feet on a step or plate.
                 Lower your heels as far as you can.
                 Rise up onto your toes as high as possible and pause.
                 Lower slowly.
@@ -351,18 +324,6 @@ object SeedExercises {
             startWeightKg = 8.0, startReps = 10,
         ),
         Exercise(
-            name = "Triceps Pushdown", muscleGroup = "Arms", equipment = "Cable machine", isBodyweight = false,
-            instructions = """
-                Stand facing the cable machine with a rope or bar attached up high.
-                Elbows at your sides, push the handle down until your arms are straight.
-                Let it come back up slowly until your forearms are just above parallel.
-            """.trimIndent(),
-            tips = """
-                Only your forearms move; elbows stay put.
-            """.trimIndent(),
-            startWeightKg = 15.0, startReps = 10,
-        ),
-        Exercise(
             name = "Bench Dip", muscleGroup = "Arms", equipment = "Bench", isBodyweight = true,
             instructions = """
                 Sit on the edge of a bench, hands next to your hips.
@@ -377,19 +338,22 @@ object SeedExercises {
             startReps = 8,
         ),
 
-        // Core
         Exercise(
-            name = "Hanging Knee Raise", muscleGroup = "Core", equipment = "Pull-up bar", isBodyweight = true,
+            name = "Overhead Triceps Extension", muscleGroup = "Arms", equipment = "Dumbbell", isBodyweight = false,
             instructions = """
-                Hang from a pull-up bar with straight arms.
-                Bring your knees up towards your chest by curling your hips.
-                Lower your legs slowly without swinging.
+                Sit on a bench with back support, holding one dumbbell with both hands above your head.
+                Keep your upper arms next to your ears.
+                Lower the dumbbell behind your head by bending your elbows.
+                Straighten your arms to lift it back up.
             """.trimIndent(),
             tips = """
-                Think about tilting your pelvis up, not just lifting your knees.
+                Only your forearms move.
+                Keep your core tight so your lower back doesn't arch.
             """.trimIndent(),
-            easierName = "Dead Bug", startReps = 8,
+            easierName = "Bench Dip", startWeightKg = 10.0, startReps = 10,
         ),
+
+        // Core
         Exercise(
             name = "Dead Bug", muscleGroup = "Core", equipment = "Bodyweight", isBodyweight = true,
             instructions = """
@@ -402,7 +366,70 @@ object SeedExercises {
                 Your lower back must stay flat on the floor.
                 Move slowly; this is about control.
             """.trimIndent(),
-            harderName = "Hanging Knee Raise", startReps = 8,
+            harderName = "Lying Leg Raise", startReps = 8,
+        ),
+        Exercise(
+            name = "Lying Leg Raise", muscleGroup = "Core", equipment = "Bench or floor", isBodyweight = true,
+            instructions = """
+                Lie on your back on a bench or the floor, hands under your hips or holding the bench behind your head.
+                Keep your legs straight and together.
+                Raise your legs until they point at the ceiling.
+                Lower them slowly until just above the floor or bench.
+            """.trimIndent(),
+            tips = """
+                Keep your lower back pressed down.
+                Bend your knees a little to make it easier.
+            """.trimIndent(),
+            easierName = "Dead Bug", startReps = 8,
+        ),
+
+        // Cardio: minutes are stored as reps, the coach adds or cuts time.
+        Exercise(
+            name = "Treadmill Run", muscleGroup = "Cardio", equipment = "Treadmill", isBodyweight = true, isCardio = true,
+            instructions = """
+                Start with 3 to 5 minutes of walking to warm up.
+                Increase the speed to a pace where you can still talk in short sentences.
+                Land softly under your hips with short, quick steps.
+                Finish with a few minutes of walking to cool down.
+                Log the total minutes and the distance on the display.
+            """.trimIndent(),
+            tips = """
+                Set the incline to 1% to make it feel more like running outside.
+                Don't hold the handrails while running.
+                On a moving ship, keep the speed a bit lower and use the safety clip.
+            """.trimIndent(),
+            startReps = 20, startSets = 1,
+        ),
+        Exercise(
+            name = "Rowing Machine", muscleGroup = "Cardio", equipment = "Rower", isBodyweight = true, isCardio = true,
+            instructions = """
+                Strap your feet in so the strap crosses the widest part of your foot.
+                Drive: push with your legs first, then lean back slightly, then pull the handle to your lower ribs.
+                Recovery: arms forward first, then lean forward, then bend your knees to slide back.
+                Keep a steady rhythm, about 20 to 26 strokes per minute.
+                Log the total minutes and the distance on the monitor.
+            """.trimIndent(),
+            tips = """
+                It's about 60% legs, 20% body, 20% arms.
+                Damper around 3 to 5 is plenty; higher is not better.
+                Keep your back straight, never hunched.
+            """.trimIndent(),
+            startReps = 15, startSets = 1,
+        ),
+        Exercise(
+            name = "Zwift Bike", muscleGroup = "Cardio", equipment = "Indoor bike", isBodyweight = true, isCardio = true,
+            instructions = """
+                Set the saddle so your knee is slightly bent at the bottom of the pedal stroke.
+                Warm up for 5 minutes at an easy effort.
+                Ride a route or workout at a pace where you can still talk in short sentences.
+                Cool down for a few minutes, then log the total minutes and distance from Zwift.
+            """.trimIndent(),
+            tips = """
+                Keep a cadence of around 80 to 95 rpm.
+                Use a fan and a towel; indoor riding gets hot fast.
+                Zwift's structured workouts are a good way to add intervals later.
+            """.trimIndent(),
+            startReps = 30, startSets = 1,
         ),
     )
 }

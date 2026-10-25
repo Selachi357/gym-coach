@@ -50,6 +50,7 @@ import com.gymcoach.data.ExerciseTarget
 import com.gymcoach.data.SetEntry
 import com.gymcoach.ui.GymTopBar
 import com.gymcoach.ui.LocalRepository
+import com.gymcoach.ui.describeSet
 import com.gymcoach.ui.formatTarget
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -104,8 +105,8 @@ fun WorkoutScreen(
                     exercise = exercise,
                     target = targetMap[exercise.id] ?: repo.defaultTarget(exercise),
                     sets = sets.filter { it.exerciseId == exercise.id },
-                    onLog = { weight, reps, effort ->
-                        scope.launch { repo.logSet(sessionId, exercise.id, weight, reps, effort) }
+                    onLog = { weight, reps, effort, distance ->
+                        scope.launch { repo.logSet(sessionId, exercise.id, weight, reps, effort, distance) }
                     },
                     onDeleteSet = { set -> scope.launch { repo.deleteSet(set) } },
                     onTooHard = {
@@ -172,7 +173,7 @@ private fun ExerciseCard(
     exercise: Exercise,
     target: ExerciseTarget,
     sets: List<SetEntry>,
-    onLog: (weightKg: Double, reps: Int, effort: Int) -> Unit,
+    onLog: (weightKg: Double, reps: Int, effort: Int, distanceKm: Double) -> Unit,
     onDeleteSet: (SetEntry) -> Unit,
     onTooHard: () -> Unit,
     onInfo: () -> Unit,
@@ -181,7 +182,10 @@ private fun ExerciseCard(
     var weightText by remember(target.weightKg) { mutableStateOf(formatKg(target.weightKg)) }
     var repsText by remember(target.reps) { mutableStateOf(target.reps.toString()) }
     var effort by remember { mutableFloatStateOf(7f) }
-    val weight = weightText.replace(',', '.').toDoubleOrNull()
+    var distanceText by remember { mutableStateOf("") }
+    val cardio = exercise.isCardio
+    val weight = if (cardio) 0.0 else weightText.replace(',', '.').toDoubleOrNull()
+    val distance = if (distanceText.isBlank()) 0.0 else distanceText.replace(',', '.').toDoubleOrNull()
     val reps = repsText.toIntOrNull()
 
     Card {
@@ -190,7 +194,7 @@ private fun ExerciseCard(
                 Column(Modifier.weight(1f)) {
                     Text(exercise.name, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Coach target: ${formatTarget(target.sets, target.reps, target.weightKg)}",
+                        "Coach target: ${formatTarget(target.sets, target.reps, target.weightKg, cardio)}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -205,9 +209,8 @@ private fun ExerciseCard(
                 Spacer(Modifier.size(8.dp))
                 sets.forEachIndexed { index, set ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        val load = if (set.weightKg > 0) "${formatKg(set.weightKg)} kg × " else ""
                         Text(
-                            "Set ${index + 1}: $load${set.reps} reps · ${effortLabel(set.effort)} (${set.effort}/10)",
+                            "${if (cardio) "Bout" else "Set"} ${index + 1}: ${describeSet(exercise, set)} · ${effortLabel(set.effort)} (${set.effort}/10)",
                             modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -216,7 +219,7 @@ private fun ExerciseCard(
                         }
                     }
                 }
-                Text(
+                if (!cardio) Text(
                     "${sets.size} of ${target.sets} sets done",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.secondary,
@@ -226,19 +229,31 @@ private fun ExerciseCard(
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = weightText,
-                    onValueChange = { weightText = it },
-                    label = { Text(if (exercise.isBodyweight) "Extra kg" else "kg") },
-                    singleLine = true,
-                    isError = weight == null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.weight(1f),
-                )
+                if (cardio) {
+                    OutlinedTextField(
+                        value = distanceText,
+                        onValueChange = { distanceText = it },
+                        label = { Text("Distance km") },
+                        singleLine = true,
+                        isError = distance == null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    OutlinedTextField(
+                        value = weightText,
+                        onValueChange = { weightText = it },
+                        label = { Text(if (exercise.isBodyweight) "Extra kg" else "kg") },
+                        singleLine = true,
+                        isError = weight == null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
                 OutlinedTextField(
                     value = repsText,
                     onValueChange = { repsText = it.filter(Char::isDigit) },
-                    label = { Text("Reps") },
+                    label = { Text(if (cardio) "Minutes" else "Reps") },
                     singleLine = true,
                     isError = reps == null,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -251,10 +266,10 @@ private fun ExerciseCard(
             Slider(value = effort, onValueChange = { effort = it }, valueRange = 1f..10f, steps = 8)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
-                    onClick = { if (weight != null && reps != null) onLog(weight, reps, effortInt) },
-                    enabled = weight != null && reps != null && reps > 0,
+                    onClick = { if (weight != null && reps != null && distance != null) onLog(weight, reps, effortInt, distance) },
+                    enabled = weight != null && distance != null && reps != null && reps > 0,
                     modifier = Modifier.weight(1f),
-                ) { Text("Log set") }
+                ) { Text(if (cardio) "Log" else "Log set") }
                 OutlinedButton(onClick = onTooHard, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Filled.SentimentDissatisfied, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
