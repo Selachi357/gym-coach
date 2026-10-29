@@ -43,21 +43,21 @@ enum class BuildingType(
     val yield: Res,
     val description: String,
 ) {
-    TOWN_HALL("Town Hall", Res(100, 60, 60, 20), 5, 1, Res(), "Heart of the city. Each level unlocks buildings, adds building plots and +5 wall HP."),
+    TOWN_HALL("Town Hall", Res(100, 60, 60, 20), 5, 1, Res(), "Heart of the city. Each level unlocks buildings, adds building plots and about +1 castle life in Castle Defender."),
     HOUSE("House", Res(20, 15, 0, 0), 3, 1, Res(gold = 3), "Taxes: +3 gold per workout per level. +1 next to a well or market."),
     FARM("Farm", Res(15, 10, 0, 0), 3, 1, Res(food = 3), "+3 food per workout per level. +1 next to water."),
     LUMBER_MILL("Lumber Mill", Res(20, 0, 10, 0), 3, 1, Res(wood = 3), "+3 wood per workout per level. +1 for every tree next to it."),
     QUARRY("Quarry", Res(25, 15, 0, 0), 3, 1, Res(stone = 3), "+3 stone per workout per level. +1 for every rock next to it."),
     WELL("Well", Res(10, 0, 10, 0), 1, 1, Res(), "Fresh water. Houses and farms next to it make +1 more."),
-    WALL("Wall", Res(5, 0, 10, 0), 3, 1, Res(), "Defender: +4 wall HP per level."),
-    ARCHER_TOWER("Archer Tower", Res(30, 20, 20, 10), 3, 2, Res(), "Defender: +1 archer per level."),
-    BLACKSMITH("Blacksmith", Res(40, 20, 30, 0), 3, 2, Res(), "Defender: +1 arrow damage per level."),
+    WALL("Wall", Res(5, 0, 10, 0), 3, 1, Res(), "Defender: +1 castle life per level."),
+    ARCHER_TOWER("Archer Tower", Res(30, 20, 20, 10), 3, 2, Res(), "Defender: archer towers do +10% damage per level."),
+    BLACKSMITH("Blacksmith", Res(40, 20, 30, 0), 3, 2, Res(), "Defender: every tower does +8% damage per level."),
     MARKET("Market", Res(50, 30, 20, 20), 3, 2, Res(gold = 4), "+4 gold per workout per level. +1 for every house next to it."),
     TAVERN("Tavern", Res(35, 25, 10, 15), 3, 2, Res(gold = 3, food = 1), "+3 gold and +1 food per workout per level. Travellers bring news of new quests."),
     STABLE("Stable", Res(40, 35, 15, 25), 3, 2, Res(), "Defender: mounted patrols slow enemies by 6% per level."),
     LIBRARY("Library", Res(50, 40, 30, 0), 3, 3, Res(), "Scholars count the spoils: +15% plunder from Castle Defender per level."),
-    TEMPLE("Temple", Res(60, 30, 50, 30), 3, 3, Res(), "Defender: repairs 2 wall HP per level after every wave."),
-    MAGE_TOWER("Mage Tower", Res(80, 40, 60, 40), 3, 4, Res(), "Defender: lightning hits every enemy. Faster with each level."),
+    TEMPLE("Temple", Res(60, 30, 50, 30), 3, 3, Res(), "Defender: +1 castle life back per level after every wave."),
+    MAGE_TOWER("Mage Tower", Res(80, 40, 60, 40), 3, 4, Res(), "Defender: unlocks mage towers. Each level makes meteors hit harder."),
     ;
 
     fun costFor(level: Int) = cost * level

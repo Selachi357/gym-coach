@@ -60,6 +60,8 @@ import com.gymcoach.game.CityState
 import com.gymcoach.game.TrainingTotals
 import com.gymcoach.game.Island
 import com.gymcoach.game.Loadout
+import com.gymcoach.game.Stage
+import com.gymcoach.game.TowerKind
 import com.gymcoach.game.Voyage
 import com.gymcoach.game.HeroStats
 import com.gymcoach.game.QuestState
@@ -387,11 +389,17 @@ private fun LazyListScope.defendItems(l: Loadout, openDefender: () -> Unit) {
     item {
         RetroPanel {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                BossSprite(Boss.DEEP_DRAGON, 96.dp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TowerKind.entries.forEach { PixelSprite(towerSprite(it), cityPalette, 48.dp) }
+                }
                 Spacer(Modifier.size(12.dp))
                 PixelText("CASTLE DEFENDER", 13.sp, Retro.gold)
                 Spacer(Modifier.size(8.dp))
-                PixelText("Goblins, bats, orcs and trolls march on your wall. Tap them to shoot. Every fifth wave brings a boss.", 8.sp)
+                PixelText(
+                    "Goblins, wolves, bats, orcs, shamans and trolls march down the road. Build archers, cannons, " +
+                        "mages and frost towers beside it, upgrade them, and call down meteors. Every fifth wave brings a boss.",
+                    8.sp,
+                )
                 Spacer(Modifier.size(14.dp))
                 RetroButton(onClick = openDefender, modifier = Modifier.fillMaxWidth()) { Text("Play") }
             }
@@ -401,25 +409,26 @@ private fun LazyListScope.defendItems(l: Loadout, openDefender: () -> Unit) {
         val context = LocalContext.current
         RetroPanel {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                PixelText("YOUR DEFENCES", 10.sp, Retro.gold)
-                StatLine("WALL HP", l.wallHp.toString())
-                StatLine("ARROW DAMAGE", l.tapDamage.toString())
-                StatLine("ARCHERS", l.archers.toString())
-                StatLine("REPAIR PER WAVE", l.repair.toString())
-                StatLine("LIGHTNING", l.lightningInterval?.let { "EVERY ${it.toInt()}S" } ?: "NO MAGE TOWER")
-                StatLine("ENEMY SLOW", "${(l.slow * 100).toInt()}%")
-                StatLine("BATTLE RAGE", if (l.rage) "ON ×2" else "OFF")
-                StatLine("BEST WAVE", DefenderRecords.bestWave(context).toString())
-                StatLine("BEST SCORE", DefenderRecords.bestScore(context).toString())
+                PixelText("YOUR ARMY", 10.sp, Retro.gold)
+                StatLine("CASTLE LIVES", l.lives.toString())
+                StatLine("STARTING GOLD", l.startGold.toString())
+                StatLine("TOWER DAMAGE", "+${(l.damageBonus * 100).toInt()}%")
+                StatLine("MAGE TOWERS", if (l.mageUnlocked) "YES" else "LOCKED")
+                StatLine("BATTLE RAGE", if (l.rage) "ON +25%" else "OFF")
+                Stage.entries.forEach { stage ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        PixelText(stage.title.uppercase(), 8.sp, Retro.parchment, Modifier.weight(1f))
+                        Stars(DefenderRecords.stars(context, stage), 12.dp)
+                    }
+                }
             }
         }
     }
     item {
         PixelText(
-            "Your training is your army. Wall HP: 10, +5 per town hall level, +4 per wall level. Archers: one per " +
-                "archer tower level. Arrow damage: +1 every 5 hero levels, every 2 bosses slain and every blacksmith level. " +
-                "Temples repair the wall, stables slow enemies, mage towers call lightning and libraries add plunder. " +
-                "Trained today? Battle rage doubles your arrows. Plunder goes to your village.",
+            "Your training is your army. Walls and the town hall add castle lives, blacksmiths and slain bosses add damage, " +
+                "temples win lives back, stables slow enemies, a mage tower unlocks mage towers and libraries add plunder. " +
+                "Trained today? Battle rage gives +25% damage and spells ready from the start. Plunder goes to your village.",
             7.sp, Retro.dim,
         )
     }
