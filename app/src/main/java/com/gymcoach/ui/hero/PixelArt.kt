@@ -13,7 +13,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Dp
 import com.gymcoach.R
 import com.gymcoach.game.Badge
+import com.gymcoach.game.Gear
 import com.gymcoach.game.Rank
+import com.gymcoach.game.Slot
 
 val PixelFont = FontFamily(Font(R.font.press_start_2p))
 
@@ -182,10 +184,66 @@ private fun overlay(grid: Array<CharArray>, layer: List<String>, onlyEmpty: Bool
     }
 }
 
-/** The hero for a rank: gear is added as you rank up. */
+/** What the hero looks like in the gear they wear. */
+private fun lookFor(gear: Map<Slot, Gear>): Look {
+    val steel = Color(0xFFC0C8D0)
+    val (torso, legs, belt) = when (gear[Slot.ARMOUR]) {
+        Gear.LEATHER -> Triple(Color(0xFF8B5A2B), Color(0xFF4A3B2A), Color(0xFF4A2F1B))
+        Gear.RANGER_GARB -> Triple(Color(0xFF3F7A3A), Color(0xFF4A3B2A), Color(0xFF6B4423))
+        Gear.ROGUE_LEATHERS -> Triple(Color(0xFF34344A), Color(0xFF22222E), Color(0xFF6A3D9A))
+        Gear.CHAINMAIL -> Triple(Color(0xFF9AA3AD), Color(0xFF5A6570), Color(0xFF4A2F1B))
+        Gear.PLATE -> Triple(Color(0xFFD5DCE3), Color(0xFFB0B8C0), Color(0xFF4A2F1B))
+        Gear.GOLDEN_PLATE -> Triple(Retro.gold, Color(0xFFC9981B), Color(0xFFB03030))
+        else -> Triple(Color(0xFF8B7355), Color(0xFF5C4A3A), Color(0xFF4A2F1B))
+    }
+    val (blade, guard) = when (gear[Slot.WEAPON]) {
+        Gear.IRON_SWORD -> steel to Color(0xFF8B5A2B)
+        Gear.KNIGHTS_BLADE -> Color(0xFFE8EEF4) to Retro.gold
+        Gear.DRAGONFIRE_BLADE -> Retro.ember to Color(0xFFB03030)
+        else -> Color(0xFF9C6B3C) to Color(0xFF6B4423)
+    }
+    val (shield, crest) = when (gear[Slot.SHIELD]) {
+        Gear.WOODEN_SHIELD -> Color(0xFF8B5A2B) to Color(0xFF6B4423)
+        Gear.KITE_SHIELD -> Color(0xFF2E5A9C) to Retro.gold
+        Gear.SERPENT_SHIELD -> Color(0xFF2FA37A) to Color(0xFFB8E06A)
+        else -> null to Retro.gold
+    }
+    val head = gear[Slot.HEAD]
+    return Look(
+        torso = torso,
+        legs = legs,
+        belt = belt,
+        cap = if (head == Gear.LEATHER_CAP) Color(0xFF6B4423) else null,
+        helmet = when (head) {
+            Gear.IRON_HELM -> Color(0xFF9AA3AD)
+            Gear.PLUMED_HELM -> Color(0xFFE6ECF2)
+            else -> null
+        },
+        plume = if (head == Gear.PLUMED_HELM) Color(0xFFB03030) else null,
+        crown = head == Gear.CROWN,
+        blade = blade,
+        guard = guard,
+        shield = shield,
+        crest = crest,
+        cape = when (gear[Slot.CAPE]) {
+            Gear.BLUE_CAPE -> Color(0xFF2E5A9C)
+            Gear.CRIMSON_CAPE -> Color(0xFFB03030)
+            Gear.ROYAL_CAPE -> Color(0xFF6A3D9A)
+            else -> null
+        },
+    )
+}
+
+/** The hero for a rank, as shown on the rank ladder. */
 @Composable
-fun HeroSprite(rank: Rank, size: Dp, modifier: Modifier = Modifier) {
-    val look = lookFor(rank)
+fun HeroSprite(rank: Rank, size: Dp, modifier: Modifier = Modifier) = HeroSprite(lookFor(rank), size, modifier)
+
+/** The hero in the gear they wear. */
+@Composable
+fun HeroSprite(gear: Map<Slot, Gear>, size: Dp, modifier: Modifier = Modifier) = HeroSprite(lookFor(gear), size, modifier)
+
+@Composable
+private fun HeroSprite(look: Look, size: Dp, modifier: Modifier = Modifier) {
     val grid = Array(16) { y -> baseHero[y].toCharArray() }
     when {
         look.helmet != null -> overlay(grid, helmetLayer)

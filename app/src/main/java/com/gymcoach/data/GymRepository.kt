@@ -11,14 +11,22 @@ import com.gymcoach.coach.ProgramFocus
 import com.gymcoach.coach.ProgramPlanner
 import com.gymcoach.coach.formatKg
 import com.gymcoach.game.HeroCalculator
+import com.gymcoach.game.Attribute
+import com.gymcoach.game.AttributeCalculator
+import com.gymcoach.game.Attributes
 import com.gymcoach.game.Bonfire
 import com.gymcoach.game.BonfireCalculator
 import com.gymcoach.game.City
 import com.gymcoach.game.Contract
 import com.gymcoach.game.Contracts
+import com.gymcoach.game.Gear
+import com.gymcoach.game.HeroClass
+import com.gymcoach.game.HeroTier
+import com.gymcoach.game.Progress
 import com.gymcoach.game.CityState
 import com.gymcoach.game.HeroStats
 import com.gymcoach.game.Res
+import com.gymcoach.game.Slot
 import com.gymcoach.game.TrainingTotals
 import com.gymcoach.game.Realm
 import com.gymcoach.game.RealmCalculator
@@ -65,6 +73,24 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
         val next = contractChoices.value + (monday to contract)
         withContext(Dispatchers.IO) { contractsFile.writeText(next.entries.joinToString("\n") { "${it.key} ${it.value.name}" }) }
         contractChoices.value = next
+    }
+
+    private val gearFile = File(saveDir, "gear.txt")
+
+    private val gearPicks = MutableStateFlow(
+        runCatching {
+            gearFile.readLines().mapNotNull { line ->
+                val p = line.trim().split(' ')
+                runCatching { Slot.valueOf(p[0]) to Gear.valueOf(p[1]) }.getOrNull()
+            }.toMap()
+        }.getOrDefault(emptyMap()),
+    )
+
+    /** Wears an unlocked piece of gear. */
+    suspend fun equip(gear: Gear) {
+        val next = gearPicks.value + (gear.slot to gear)
+        withContext(Dispatchers.IO) { gearFile.writeText(next.entries.joinToString("\n") { "${it.key.name} ${it.value.name}" }) }
+        gearPicks.value = next
     }
 
     private val cityState = MutableStateFlow(runCatching { City.decode(cityFile.readText()) }.getOrDefault(CityState()))
@@ -115,18 +141,21 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
             GameInputs(a, b, c, d, e)
         },
         contractChoices,
-    ) { inputs, choices -> buildGame(inputs, choices) }
+        gearPicks,
+    ) { inputs, choices, picks -> buildGame(inputs, choices, picks) }
 
     val hero: Flow<HeroStats> = game.map { it.hero }
 
     suspend fun gameNow(): GameState = buildGame(
         GameInputs(dao.getFinishedSessions(), dao.getFinishedSets(), dao.allExercises(), dao.allGoals(), dao.getActiveProgram()),
         contractChoices.value,
+        gearPicks.value,
     )
 
-    private fun buildGame(inputs: GameInputs, choices: Map<LocalDate, Contract>): GameState {
+    private fun buildGame(inputs: GameInputs, choices: Map<LocalDate, Contract>, picks: Map<Slot, Gear>): GameState {
         val (sessions, sets, exercises, goals, program) = inputs
         val cardio = exercises.filter { it.isCardio }.map { it.id }.toSet()
+        val mobility = exercises.filter { it.muscleGroup == "Mobility" }.map { it.id }.toSet()
         val setsBySession = sets.groupBy { it.sessionId }
         val zone = ZoneId.systemDefault()
         val records = sessions.map { s ->
@@ -134,7 +163,7 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
                 date = Instant.ofEpochMilli(s.startedAt).atZone(zone).toLocalDate(),
                 inProgram = s.programId != null,
                 sets = setsBySession[s.id].orEmpty().map {
-                    SetRecord(it.exerciseId, it.weightKg, it.reps, it.exerciseId in cardio, it.distanceKm)
+                    SetRecord(it.exerciseId, it.weightKg, it.reps, it.exerciseId in cardio, it.distanceKm, it.exerciseId in mobility)
                 },
             )
         }
@@ -163,6 +192,15 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
             campaignStart = programStart,
             sessionsPerWeek = program?.let { ProgramPlanner.workoutsPerWeek(it.focusEnum(), it.daysPerWeek) } ?: weeklyTarget,
         )
+        val attributes = AttributeCalculator.compute(records, contracts.completed, hero.keptWeeks, bonfire.best)
+        val progress = Progress(
+            hero = hero,
+            attributes = attributes,
+            bestBonfire = bonfire.best,
+            contracts = contracts.completed,
+            slain = realm.campaign.slain,
+            planWorkouts = records.count { it.inProgram },
+        )
         return GameState(
             hero = hero,
             realm = realm,
@@ -171,6 +209,10 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
             bonfire = bonfire,
             contracts = contracts,
             weeklyTarget = weeklyTarget,
+            attributes = attributes,
+            heroClass = AttributeCalculator.heroClass(attributes),
+            progress = progress,
+            gear = Gear.equipped(progress, picks),
         )
     }
     fun finishedProgramSessions(programId: Long): Flow<List<WorkoutSession>> = dao.finishedProgramSessions(programId)
@@ -314,6 +356,9 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
         val celebration = HeroCalculator.celebrate(gameBefore.hero, gameAfter.hero) +
             BonfireCalculator.celebrate(gameBefore.bonfire, gameAfter.bonfire, gameBefore.contracts, gameAfter.contracts) +
             RealmCalculator.celebrate(gameBefore.realm, gameAfter.realm) +
+            Attribute.entries.filter { gameAfter.attributes[it] > gameBefore.attributes[it] }
+                .map { "${it.short} up! ${it.title} ${gameBefore.attributes[it]} → ${gameAfter.attributes[it]}." } +
+            (gameAfter.unlockedGear - gameBefore.unlockedGear.toSet()).map { "New gear: ${it.title}! Equip it on the Hero page." } +
             listOfNotNull(
                 "Village: +${earned.gold} gold, +${earned.wood} wood, +${earned.stone} stone, +${earned.food} food."
                     .takeIf { !earned.isZero },
@@ -548,4 +593,12 @@ data class GameState(
     val bonfire: Bonfire,
     val contracts: Contracts,
     val weeklyTarget: Int,
-)
+    val attributes: Attributes,
+    val heroClass: HeroClass,
+    val progress: Progress,
+    /** What the hero wears in each slot. */
+    val gear: Map<Slot, Gear>,
+) {
+    val tier: HeroTier get() = HeroTier.forLevel(hero.level)
+    val unlockedGear: List<Gear> get() = Gear.entries.filter { it.unlocked(progress) }
+}

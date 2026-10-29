@@ -12,6 +12,8 @@ data class SetRecord(
     val reps: Int,
     val cardio: Boolean,
     val distanceKm: Double = 0.0,
+    /** Mobility holds train AGI instead of STR. */
+    val mobility: Boolean = false,
 )
 
 data class WorkoutRecord(

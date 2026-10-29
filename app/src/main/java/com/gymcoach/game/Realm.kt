@@ -39,6 +39,8 @@ data class Campaign(
     val loot: List<String>,
 ) {
     val current: BossFight? get() = fights.firstOrNull { it.status == BossStatus.ACTIVE }
+    /** Every boss beaten at least once, in any campaign. */
+    val slain: Set<Boss> get() = Boss.entries.filter { it.loot in loot }.toSet()
 }
 
 /** Stops on the voyage. [km] is the distance from port; the chest opens after [strengthSessions] strength workouts. */

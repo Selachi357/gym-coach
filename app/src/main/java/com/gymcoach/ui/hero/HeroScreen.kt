@@ -34,11 +34,14 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.gymcoach.game.Attribute
 import com.gymcoach.game.Badge
 import com.gymcoach.game.Bonfire
 import com.gymcoach.game.BonfireMilestone
 import com.gymcoach.game.Contract
 import com.gymcoach.game.Contracts
+import com.gymcoach.game.Gear
+import com.gymcoach.game.Slot
 import com.gymcoach.game.Boss
 import com.gymcoach.game.BossFight
 import com.gymcoach.game.BossStatus
@@ -105,7 +108,7 @@ fun HeroBanner(onClick: () -> Unit) {
     val fight = game?.realm?.campaign?.current
     RetroPanel(Modifier.clickable(onClick = onClick)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            HeroSprite(h.rank, 72.dp)
+            HeroSprite(game?.gear.orEmpty(), 72.dp)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 PixelText(h.rank.title.uppercase(), 11.sp, Retro.gold)
@@ -157,7 +160,11 @@ fun HeroScreen(openDefender: () -> Unit, openCity: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             when (tab) {
-                RealmTab.HERO -> heroItems(g, onContract = { c -> scope.launch { repo.chooseContract(c) } })
+                RealmTab.HERO -> heroItems(
+                    g,
+                    onContract = { c -> scope.launch { repo.chooseContract(c) } },
+                    onEquip = { gear -> scope.launch { repo.equip(gear) } },
+                )
                 RealmTab.BOSS -> campaignItems(g.realm.campaign)
                 RealmTab.VOYAGE -> voyageItems(g.realm.voyage)
                 RealmTab.VILLAGE -> villageItems(city, g.training, openCity, openDefender)
@@ -190,13 +197,16 @@ private fun PixelTabs(selected: RealmTab, onSelect: (RealmTab) -> Unit) {
     }
 }
 
-private fun LazyListScope.heroItems(g: GameState, onContract: (Contract) -> Unit) {
+private fun LazyListScope.heroItems(g: GameState, onContract: (Contract) -> Unit, onEquip: (Gear) -> Unit) {
     val h = g.hero
-    item { CharacterSheet(h) }
+    item { CharacterSheet(g) }
     item { BonfirePanel(g.bonfire) }
     item { ContractPanel(g.contracts, g.weeklyTarget, onContract) }
+    item { AttributesPanel(g) }
     item { StreakPanel(h) }
     item { StatsPanel(h) }
+    item { PixelText("GEAR", 12.sp, Retro.gold) }
+    item { GearPanel(g, onEquip) }
     item { PixelText("QUESTS", 12.sp, Retro.gold) }
     items(h.quests, key = { it.quest.name }) { QuestRow(it) }
     item { PixelText("RANKS", 12.sp, Retro.gold) }
@@ -510,20 +520,96 @@ private fun ContractPanel(c: Contracts, weeklyTarget: Int, onContract: (Contract
 }
 
 @Composable
-private fun CharacterSheet(h: HeroStats) {
+private fun CharacterSheet(g: GameState) {
+    val h = g.hero
     RetroPanel {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-            HeroSprite(h.rank, 160.dp)
+            PixelText(g.tier.title.uppercase(), 8.sp, Retro.dim)
+            Spacer(Modifier.size(8.dp))
+            HeroSprite(g.gear, 160.dp)
             Spacer(Modifier.size(12.dp))
             PixelText(h.rank.title.uppercase(), 14.sp, Retro.gold)
             Spacer(Modifier.size(6.dp))
-            PixelText("LEVEL ${h.level}", 11.sp)
+            PixelText("LEVEL ${h.level} ${g.heroClass.title.uppercase()}", 11.sp)
             Spacer(Modifier.size(10.dp))
             PixelBar(h.xpIntoLevel.toFloat() / h.xpForNextLevel, Retro.xp, height = 16.dp)
             Spacer(Modifier.size(6.dp))
             PixelText("${h.xpIntoLevel} / ${h.xpForNextLevel} XP · ${h.xp} TOTAL", 8.sp)
             Spacer(Modifier.size(10.dp))
             PixelText(h.rank.flavor, 8.sp, Retro.dim)
+        }
+    }
+}
+
+private val attributeColors = mapOf(
+    Attribute.STR to Color(0xFFE04040),
+    Attribute.VIT to Retro.xp,
+    Attribute.AGI to Color(0xFF3FC1E0),
+    Attribute.WIS to Color(0xFF9A6AD0),
+    Attribute.CON to Retro.gold,
+)
+
+@Composable
+private fun AttributesPanel(g: GameState) {
+    RetroPanel {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            PixelText("CLASS: ${g.heroClass.title.uppercase()}", 10.sp, Retro.gold)
+            PixelText(g.heroClass.perk, 7.sp, Retro.dim)
+            Spacer(Modifier.size(2.dp))
+            Attribute.entries.forEach { a ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PixelText(a.short, 9.sp, attributeColors.getValue(a), Modifier.width(40.dp))
+                    PixelText(g.attributes[a].toString().padStart(2), 9.sp, Retro.parchment, Modifier.width(32.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        PixelBar(g.attributes.progress[a] ?: 0f, attributeColors.getValue(a), segments = 10, height = 10.dp)
+                        PixelText(a.source, 6.sp, Retro.dim)
+                    }
+                }
+            }
+            PixelText(
+                "Attributes only count what you log, and each point takes a little more than the last. " +
+                    "Your class follows your training mix: train all three of STR, VIT and AGI evenly to become a Paladin.",
+                7.sp, Retro.dim,
+            )
+        }
+    }
+}
+
+@Composable
+private fun GearPanel(g: GameState, onEquip: (Gear) -> Unit) {
+    RetroPanel {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Slot.entries.forEach { slot ->
+                PixelText(slot.title.uppercase(), 8.sp, Retro.dim)
+                Gear.forSlot(slot).forEach { gear ->
+                    val unlocked = gear in g.unlockedGear
+                    val worn = g.gear[slot] == gear
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(if (worn) Retro.panel else Color.Transparent)
+                            .then(if (unlocked && !worn) Modifier.clickable { onEquip(gear) } else Modifier)
+                            .padding(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            PixelText(
+                                if (unlocked) gear.title.uppercase() else "???",
+                                8.sp, if (worn) Retro.gold else if (unlocked) Retro.parchment else Retro.dim,
+                            )
+                            PixelText(gear.rule, 6.sp, Retro.dim)
+                        }
+                        PixelText(
+                            when {
+                                worn -> "WORN"
+                                unlocked -> "EQUIP"
+                                else -> "LOCKED"
+                            },
+                            7.sp, if (worn) Retro.xp else if (unlocked) Retro.gold else Retro.dim,
+                        )
+                    }
+                }
+            }
         }
     }
 }

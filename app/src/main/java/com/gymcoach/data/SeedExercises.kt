@@ -438,6 +438,91 @@ object SeedExercises {
             """.trimIndent(),
             easierName = "Dead Bug", startReps = 20,
         ),
+        // Mobility: timed holds, logged in seconds. They train AGI in the hero game.
+        Exercise(
+            name = "Deep Squat Hold", muscleGroup = "Mobility", equipment = "Bodyweight", isBodyweight = true,
+            instructions = """
+                Feet a bit wider than your hips, toes slightly out.
+                Sink as low as you can with your heels down and chest up.
+                Push your knees out with your elbows and breathe slowly.
+                Log the seconds you held.
+            """.trimIndent(),
+            tips = """
+                Hold a rack or doorframe for balance, especially at sea.
+                Put small plates under your heels if they lift.
+            """.trimIndent(),
+            startReps = 30, startSets = 2,
+        ),
+        Exercise(
+            name = "World's Greatest Stretch", muscleGroup = "Mobility", equipment = "Bodyweight", isBodyweight = true,
+            instructions = """
+                Step into a long lunge and put both hands on the floor inside your front foot.
+                Drop your front elbow towards the floor, then rotate that arm up to the ceiling.
+                Hold, breathe, then switch sides halfway through the set.
+                Log the seconds for the whole set.
+            """.trimIndent(),
+            tips = """
+                Keep the back knee straight or rest it on the floor.
+                Move slowly; this is a stretch, not a race.
+            """.trimIndent(),
+            startReps = 40, startSets = 2,
+        ),
+        Exercise(
+            name = "Couch Stretch", muscleGroup = "Mobility", equipment = "Bench or wall", isBodyweight = true,
+            instructions = """
+                Kneel with one shin up against a bench or wall behind you.
+                Bring the other foot forward into a lunge.
+                Squeeze your glute and lift your chest until you feel the front of the hip stretch.
+                Log the seconds per side.
+            """.trimIndent(),
+            tips = """
+                Pad the knee with a towel.
+                Great after long watches standing or sitting.
+            """.trimIndent(),
+            startReps = 30, startSets = 2,
+        ),
+        Exercise(
+            name = "Thoracic Rotation", muscleGroup = "Mobility", equipment = "Bodyweight", isBodyweight = true,
+            instructions = """
+                Lie on your side with knees bent to 90° and arms straight out in front.
+                Keep your knees down and open the top arm across to the other side.
+                Follow your hand with your eyes and breathe out as you rotate.
+                Log the seconds per side.
+            """.trimIndent(),
+            tips = """
+                Keep the knees together on the floor.
+                Only go as far as your back allows without pain.
+            """.trimIndent(),
+            startReps = 30, startSets = 2,
+        ),
+        Exercise(
+            name = "Hip Flexor Stretch", muscleGroup = "Mobility", equipment = "Bodyweight", isBodyweight = true,
+            instructions = """
+                Half-kneel with one knee down and the other foot forward.
+                Tuck your pelvis under and shift forward until the front of the back hip stretches.
+                Raise the arm on the kneeling side for a deeper stretch.
+                Log the seconds per side.
+            """.trimIndent(),
+            tips = """
+                Don't arch your lower back.
+                Use it as an easier version of the couch stretch.
+            """.trimIndent(),
+            harderName = "Couch Stretch", startReps = 30, startSets = 2,
+        ),
+        Exercise(
+            name = "Shoulder Dislocates", muscleGroup = "Mobility", equipment = "Resistance band or towel", isBodyweight = true,
+            instructions = """
+                Hold a band or towel wide with straight arms in front of you.
+                Slowly lift it over your head and behind you, then back.
+                Keep moving smoothly for the whole set.
+                Log the seconds.
+            """.trimIndent(),
+            tips = """
+                Widen your grip if it pinches.
+                A good warm-up before pressing.
+            """.trimIndent(),
+            startReps = 30, startSets = 2,
+        ),
         // Cardio: minutes are stored as reps, the coach adds or cuts time.
         Exercise(
             name = "Treadmill Run", muscleGroup = "Cardio", equipment = "Treadmill", isBodyweight = true, isCardio = true,
@@ -505,5 +590,8 @@ object SeedExercises {
     )
 
     /** Holds that log seconds instead of reps. */
-    val TIMED = setOf("Plank")
+    val TIMED = setOf(
+        "Plank", "Deep Squat Hold", "World's Greatest Stretch", "Couch Stretch", "Thoracic Rotation",
+        "Hip Flexor Stretch", "Shoulder Dislocates",
+    )
 }
