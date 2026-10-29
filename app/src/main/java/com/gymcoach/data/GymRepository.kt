@@ -89,7 +89,7 @@ class GymRepository(private val db: GymDatabase) {
             sessionsPerWeek = program?.let { ProgramPlanner.workoutsPerWeek(it.focusEnum(), it.daysPerWeek) } ?: weeklyTarget,
             keptWeeks = hero.keptWeeks,
         )
-        return GameState(hero, realm)
+        return GameState(hero, realm, trainedToday = records.any { it.date == today })
     }
     fun finishedProgramSessions(programId: Long): Flow<List<WorkoutSession>> = dao.finishedProgramSessions(programId)
 
@@ -451,4 +451,4 @@ fun ExerciseTarget.withPlan(plan: SessionExercise) = copy(
     sets = plan.plannedSets ?: sets,
 )
 
-data class GameState(val hero: HeroStats, val realm: Realm)
+data class GameState(val hero: HeroStats, val realm: Realm, val trainedToday: Boolean)

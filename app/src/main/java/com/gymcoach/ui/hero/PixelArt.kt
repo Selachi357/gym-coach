@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Dp
@@ -28,6 +29,16 @@ object Retro {
     val hp = Color(0xFFE04040)
     val sea = Color(0xFF3FC1E0)
     val stone = Color(0xFFB0B8C8)
+}
+
+/** Paints a character grid as square pixels of [px] each, starting at [topLeft]. */
+fun DrawScope.drawPixels(rows: List<String>, palette: Map<Char, Color>, topLeft: Offset, px: Float) {
+    rows.forEachIndexed { y, row ->
+        row.forEachIndexed { x, c ->
+            val color = palette[c] ?: return@forEachIndexed
+            drawRect(color, Offset(topLeft.x + x * px, topLeft.y + y * px), Size(px + 0.5f, px + 0.5f))
+        }
+    }
 }
 
 /** Draws a grid of characters as square pixels; '.' is transparent. */

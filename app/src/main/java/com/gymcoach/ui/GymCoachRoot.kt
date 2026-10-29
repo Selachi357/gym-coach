@@ -34,6 +34,7 @@ import com.gymcoach.ui.goals.GoalsScreen
 import com.gymcoach.ui.history.HistoryScreen
 import com.gymcoach.ui.history.SessionDetailScreen
 import com.gymcoach.ui.guide.GuideScreen
+import com.gymcoach.ui.hero.DefenderScreen
 import com.gymcoach.ui.hero.HeroScreen
 import com.gymcoach.ui.hero.PixelIcon
 import com.gymcoach.ui.hero.PixelIconImage
@@ -113,7 +114,8 @@ fun GymCoachRoot() {
             }
             composable("guide") { GuideScreen(back = { nav.popBackStack() }) }
             composable("settings") { SettingsScreen(back = { nav.popBackStack() }) }
-            composable("hero") { HeroScreen() }
+            composable("hero") { HeroScreen(openDefender = { nav.navigate("defend") }) }
+            composable("defend") { DefenderScreen(back = { nav.popBackStack() }) }
             composable("exercises") {
                 ExercisesScreen(openExercise = { nav.navigate(Routes.exercise(it)) })
             }

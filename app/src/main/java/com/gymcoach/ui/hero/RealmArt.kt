@@ -201,11 +201,11 @@ private val bossColors: Map<Boss, Pair<Color, Color>> = mapOf(
     Boss.DEEP_DRAGON to (Color(0xFFB03030) to Color(0xFF6A3D9A)),
 )
 
-/** [defeated] greys the boss out. */
-@Composable
-fun BossSprite(boss: Boss, size: androidx.compose.ui.unit.Dp, defeated: Boolean = false, modifier: Modifier = Modifier) {
+fun bossRows(boss: Boss): List<String> = bossArt.getValue(boss)
+
+fun bossPalette(boss: Boss, defeated: Boolean = false): Map<Char, Color> {
     val (body, accent) = bossColors.getValue(boss)
-    val palette = if (defeated) {
+    return if (defeated) {
         mapOf('k' to Retro.night, 'a' to Retro.dim, 'b' to Retro.panel, 'e' to Retro.night, 'w' to Retro.dim, 'y' to Retro.dim, 'c' to Retro.panel)
     } else {
         mapOf(
@@ -213,7 +213,12 @@ fun BossSprite(boss: Boss, size: androidx.compose.ui.unit.Dp, defeated: Boolean 
             'y' to Retro.gold, 'c' to Color(0xFF2E5A9C),
         )
     }
-    PixelSprite(bossArt.getValue(boss), palette, size, modifier)
+}
+
+/** [defeated] greys the boss out. */
+@Composable
+fun BossSprite(boss: Boss, size: androidx.compose.ui.unit.Dp, defeated: Boolean = false, modifier: Modifier = Modifier) {
+    PixelSprite(bossArt.getValue(boss), bossPalette(boss, defeated), size, modifier)
 }
 
 // Voyage map, 64 × 40.

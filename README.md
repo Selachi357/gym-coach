@@ -14,6 +14,7 @@ An offline-first Android workout log with a built-in coach. Everything is stored
 - **Boss campaign:** six weeks, six bosses, from the Bilge Rat King to the Dragon of the Deep. Workouts deal damage; beat each boss before Sunday ends to claim its loot.
 - **Voyage map:** cardio km sail your ship across a pixel sea to ten islands; strength workouts open their treasure chests.
 - **Castle builder:** workouts earn gold and sets earn stone; your castle grows from a campfire to a royal tower, with a banner for every week you hit your target.
+- **Castle Defender:** a tap-to-shoot mini-game. Waves of goblins, bats, orcs, trolls and bosses attack your wall. Your castle gives the wall HP and archers, your level and slain bosses make arrows stronger, and training that day doubles your damage.
 - **Retro look:** every screen uses the pixel font, square pixel borders and an RPG colour palette.
 - **History:** every finished workout with sets, total volume and duration.
 - **Coach:** after each workout the coach reviews every exercise and sets your next target:

@@ -42,12 +42,15 @@ import com.gymcoach.game.Building
 import com.gymcoach.game.Campaign
 import com.gymcoach.game.Castle
 import com.gymcoach.game.Island
+import com.gymcoach.game.Loadout
 import com.gymcoach.game.Voyage
 import com.gymcoach.game.HeroStats
 import com.gymcoach.game.QuestState
 import com.gymcoach.game.Rank
 import com.gymcoach.ui.GymTopBar
 import com.gymcoach.ui.LocalRepository
+import com.gymcoach.ui.theme.RetroButton
+import androidx.compose.ui.platform.LocalContext
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -116,10 +119,10 @@ fun HeroBanner(onClick: () -> Unit) {
     }
 }
 
-private enum class RealmTab { HERO, BOSS, VOYAGE, CASTLE }
+private enum class RealmTab { HERO, BOSS, VOYAGE, CASTLE, DEFEND }
 
 @Composable
-fun HeroScreen() {
+fun HeroScreen(openDefender: () -> Unit) {
     val repo = LocalRepository.current
     val game by repo.game.collectAsStateWithLifecycle(initialValue = null)
     var tab by rememberSaveable { mutableStateOf(RealmTab.HERO) }
@@ -136,7 +139,8 @@ fun HeroScreen() {
                 RealmTab.HERO -> heroItems(g.hero)
                 RealmTab.BOSS -> campaignItems(g.realm.campaign)
                 RealmTab.VOYAGE -> voyageItems(g.realm.voyage)
-                RealmTab.CASTLE -> castleItems(g.realm.castle)
+                RealmTab.CASTLE -> castleItems(g.realm.castle, openDefender)
+                RealmTab.DEFEND -> defendItems(Loadout.from(g.hero, g.realm, g.trainedToday), openDefender)
             }
         }
     }
@@ -330,7 +334,45 @@ private fun LazyListScope.voyageItems(v: Voyage) {
     }
 }
 
-private fun LazyListScope.castleItems(c: Castle) {
+private fun LazyListScope.defendItems(l: Loadout, openDefender: () -> Unit) {
+    item {
+        RetroPanel {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                BossSprite(Boss.DEEP_DRAGON, 96.dp)
+                Spacer(Modifier.size(12.dp))
+                PixelText("CASTLE DEFENDER", 13.sp, Retro.gold)
+                Spacer(Modifier.size(8.dp))
+                PixelText("Goblins, bats, orcs and trolls march on your wall. Tap them to shoot. Every fifth wave brings a boss.", 8.sp)
+                Spacer(Modifier.size(14.dp))
+                RetroButton(onClick = openDefender, modifier = Modifier.fillMaxWidth()) { Text("Play") }
+            }
+        }
+    }
+    item {
+        val context = LocalContext.current
+        RetroPanel {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                PixelText("YOUR DEFENCES", 10.sp, Retro.gold)
+                StatLine("WALL HP", l.wallHp.toString())
+                StatLine("ARROW DAMAGE", l.tapDamage.toString())
+                StatLine("ARCHERS", l.archers.toString())
+                StatLine("BATTLE RAGE", if (l.rage) "ON ×2" else "OFF")
+                StatLine("BEST WAVE", DefenderRecords.bestWave(context).toString())
+                StatLine("BEST SCORE", DefenderRecords.bestScore(context).toString())
+            }
+        }
+    }
+    item {
+        PixelText(
+            "Your training is your army. Wall HP: +3 for every castle building. Archers: one each from the " +
+                "watchtower, barracks, gatehouse and royal tower. Arrow damage: +1 every 5 hero levels and every 2 bosses slain. " +
+                "Trained today? Battle rage doubles your arrows.",
+            7.sp, Retro.dim,
+        )
+    }
+}
+
+private fun LazyListScope.castleItems(c: Castle, openDefender: () -> Unit) {
     item {
         RetroPanel {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -340,6 +382,7 @@ private fun LazyListScope.castleItems(c: Castle) {
                     PixelText("STONE ${c.stone}", 9.sp, Retro.stone, Modifier.weight(1f))
                     PixelText("BANNERS ${c.banners}", 9.sp, Retro.hp)
                 }
+                RetroButton(onClick = openDefender, modifier = Modifier.fillMaxWidth()) { Text("Defend the castle") }
             }
         }
     }
