@@ -1,5 +1,8 @@
 package com.gymcoach.ui.program
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,8 +16,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
@@ -29,19 +32,30 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymcoach.coach.ProgramFocus
+import com.gymcoach.coach.ProgramDayPlan
 import com.gymcoach.coach.ProgramPlanner
+import com.gymcoach.coach.formatKg
 import com.gymcoach.data.Program
 import com.gymcoach.data.ProgramStatus
+import com.gymcoach.data.ProgramTicks
 import com.gymcoach.data.focusEnum
+import com.gymcoach.data.isTimed
+import com.gymcoach.data.toPrescription
+import com.gymcoach.data.weightStepKg
+import com.gymcoach.ui.formatTarget
+import com.gymcoach.ui.hero.Retro
+import com.gymcoach.ui.theme.RetroCheckbox
 import com.gymcoach.ui.GymTopBar
 import com.gymcoach.ui.LocalRepository
 import java.time.Instant
@@ -174,6 +188,9 @@ private fun ProgramOverview(program: Program) {
     val plan = ProgramPlanner.plan(program.daysPerWeek, focus).groupBy { it.week }
     val start = Instant.ofEpochMilli(program.startedAt).atZone(ZoneId.systemDefault()).toLocalDate()
     var confirmEnd by remember { mutableStateOf(false) }
+    val ticks by remember(program.id) { repo.programTicks(program.id) }.collectAsStateWithLifecycle(initialValue = ProgramTicks())
+    // Weeks opened or closed by hand; the current week starts open.
+    val expanded = remember { mutableStateMapOf<Int, Boolean>() }
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
@@ -210,6 +227,8 @@ private fun ProgramOverview(program: Program) {
         items((1..ProgramPlanner.WEEKS).toList()) { week ->
             val scheme = ProgramPlanner.scheme(focus, week)
             val current = currentWeek == week
+            val open = expanded[week] ?: (week == (currentWeek ?: 1))
+            val weekDays = plan[week].orEmpty()
             RetroCard(
                 colors = CardDefaults.cardColors(
                     containerColor = if (current) MaterialTheme.colorScheme.primaryContainer
@@ -218,39 +237,47 @@ private fun ProgramOverview(program: Program) {
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    val title = when {
-                        ProgramPlanner.isDeload(focus, week) -> "Week $week · Recovery"
-                        scheme.phase.isNotEmpty() -> "Week $week · ${scheme.phase}"
-                        else -> "Week $week"
-                    }
-                    Text(title, style = MaterialTheme.typography.titleMedium)
-                    val setsText = if (calendar) "${scheme.sets} sets per exercise." else "${scheme.sets} × ${scheme.reps} on weights."
-                    Text("$setsText ${scheme.note}", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.size(8.dp))
-                    plan[week].orEmpty().forEach { day ->
-                        val isDone = (week to day.day) in done
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                if (isDone) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
-                                contentDescription = if (isDone) "Done" else "To do",
-                                tint = if (isDone) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline,
-                                modifier = Modifier.size(18.dp),
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().clickable { expanded[week] = !open },
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            val title = when {
+                                ProgramPlanner.isDeload(focus, week) -> "Week $week · Recovery"
+                                scheme.phase.isNotEmpty() -> "Week $week · ${scheme.phase}"
+                                else -> "Week $week"
+                            }
+                            Text(title + if (current) " · now" else "", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "${weekDays.count { (week to it.day) in done }} of ${weekDays.size} workouts done",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.secondary,
                             )
-                            Spacer(Modifier.width(8.dp))
-                            Column {
-                                val label = if (calendar) {
-                                    val date = start.plusDays((week - 1) * 7L + day.day - 1)
-                                    "Day ${day.day} · ${date.format(dayMonth)} · ${day.name}"
-                                } else {
-                                    day.name
-                                }
-                                Text(label, style = MaterialTheme.typography.bodyLarge)
-                                if (current) {
-                                    Text(
-                                        day.exercises.joinToString(", ") + if (day.duration.isNotEmpty()) " · ${day.duration}" else "",
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                }
+                        }
+                        Icon(
+                            if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                            contentDescription = if (open) "Hide days" else "Show days",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    if (open) {
+                        val setsText = if (calendar) "${scheme.sets} sets per exercise." else "${scheme.sets} × ${scheme.reps} on weights."
+                        Text("$setsText ${scheme.note}", style = MaterialTheme.typography.bodyMedium)
+                        val dayNumbers = if (calendar) (1..7).toList() else weekDays.map { it.day }
+                        dayNumbers.forEach { dayNumber ->
+                            Spacer(Modifier.size(12.dp))
+                            val date = if (calendar) start.plusDays((week - 1) * 7L + dayNumber - 1) else null
+                            val day = weekDays.firstOrNull { it.day == dayNumber }
+                            if (day == null) {
+                                RestDayRow(dayNumber, date, ProgramPlanner.onboardRestNote(dayNumber))
+                            } else {
+                                DayChecklist(
+                                    program = program,
+                                    day = day,
+                                    date = date,
+                                    finished = (week to day.day) in done,
+                                    ticks = ticks,
+                                )
                             }
                         }
                     }
@@ -277,5 +304,113 @@ private fun ProgramOverview(program: Program) {
             },
             dismissButton = { TextButton(onClick = { confirmEnd = false }) { Text("Cancel") } },
         )
+    }
+}
+
+@Composable
+private fun RestDayRow(dayNumber: Int, date: LocalDate?, note: String) {
+    Column(
+        Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant).padding(10.dp),
+    ) {
+        Text(
+            listOfNotNull("Day $dayNumber", date?.format(dayMonth), "Rest").joinToString(" · ").uppercase(),
+            style = MaterialTheme.typography.labelLarge,
+            color = Retro.dim,
+        )
+        Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/**
+ * One program day as a checklist: every exercise on its own line with its target and a box to tick.
+ * Logging a set ticks the box by itself; you can also tick it by hand.
+ */
+@Composable
+fun DayChecklist(
+    program: Program,
+    day: ProgramDayPlan,
+    date: LocalDate?,
+    finished: Boolean,
+    ticks: ProgramTicks,
+    showHeader: Boolean = true,
+) {
+    val repo = LocalRepository.current
+    val scope = rememberCoroutineScope()
+    val exercises by repo.exercises.collectAsStateWithLifecycle(initialValue = emptyList())
+    val targets by repo.targets.collectAsStateWithLifecycle(initialValue = emptyList())
+    val byName = exercises.associateBy { it.name }
+    val targetMap = targets.associateBy { it.exerciseId }
+    val focus = program.focusEnum()
+    val today = date == LocalDate.now()
+    val tickedCount = day.exercises.count { ticks.isTicked(day.week, day.day, it) }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .border(if (today) 2.dp else 1.dp, if (today) Retro.gold else MaterialTheme.colorScheme.outlineVariant)
+            .background(if (today) Retro.deep else androidx.compose.ui.graphics.Color.Transparent)
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (showHeader) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    listOfNotNull("Day ${day.day}", date?.format(dayMonth)).joinToString(" · ").uppercase() +
+                        if (today) " · TODAY" else "",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Retro.gold,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    if (finished) "DONE" else "$tickedCount/${day.exercises.size}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (finished || tickedCount == day.exercises.size) Retro.xp else Retro.dim,
+                )
+            }
+            Text(
+                day.name + if (day.duration.isNotEmpty()) " · ${day.duration}" else "",
+                style = MaterialTheme.typography.titleSmall,
+            )
+        }
+        day.note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        day.exercises.forEach { name ->
+            val ticked = ticks.isTicked(day.week, day.day, name)
+            val logged = ticks.isLogged(day.week, day.day, name)
+            val ex = byName[name]
+            val target = ex?.let {
+                val base = (targetMap[it.id] ?: repo.defaultTarget(it)).toPrescription()
+                val p = ProgramPlanner.planned(focus, day.week, it.isBodyweight, it.isCardio, base, it.name, it.weightStepKg)
+                val range = if (ProgramPlanner.isCalendarBased(focus)) ProgramPlanner.onboardRepRange[name] else null
+                if (range != null && !it.isCardio) {
+                    "${p.sets} × $range" + if (p.weightKg > 0) " @ ${formatKg(p.weightKg)} kg" else ""
+                } else {
+                    formatTarget(p.sets, p.reps, p.weightKg, it.isCardio, it.isTimed)
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = !logged) {
+                        scope.launch { repo.toggleCheck(program.id, day.week, day.day, name) }
+                    }
+                    .padding(vertical = 4.dp),
+            ) {
+                RetroCheckbox(checked = ticked, faded = logged)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (ticked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        textDecoration = if (ticked) TextDecoration.LineThrough else null,
+                    )
+                    val detail = listOfNotNull(target, if (logged) "logged" else null).joinToString(" · ")
+                    if (detail.isNotEmpty()) {
+                        Text(detail, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+        }
     }
 }

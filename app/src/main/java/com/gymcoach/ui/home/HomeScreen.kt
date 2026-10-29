@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.SportsGymnastics
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -44,6 +45,7 @@ fun HomeScreen(
     openProgram: () -> Unit,
     openHero: () -> Unit,
     openSettings: () -> Unit,
+    openTimer: () -> Unit,
 ) {
     val repo = LocalRepository.current
     val scope = rememberCoroutineScope()
@@ -57,6 +59,7 @@ fun HomeScreen(
 
     Column(Modifier.fillMaxSize()) {
         GymTopBar("Gym Coach", actions = {
+            IconButton(onClick = openTimer) { Icon(Icons.Filled.Timer, contentDescription = "Timer") }
             IconButton(onClick = openSettings) { Icon(Icons.Filled.Settings, contentDescription = "Settings") }
         })
         LazyColumn(
@@ -178,7 +181,7 @@ private fun ProgramHomeCard(
             val (title, detail) = when (status) {
                 is com.gymcoach.data.ProgramStatus.Next ->
                     "Week ${status.plan.week} of 6 · ${status.plan.name}" to
-                        (status.plan.exercises.joinToString(", ") + if (status.plan.duration.isNotEmpty()) " · ${status.plan.duration}" else "")
+                        (if (status.plan.duration.isNotEmpty()) "Today's exercises · ${status.plan.duration}" else "Today's exercises")
                 is com.gymcoach.data.ProgramStatus.DoneToday ->
                     "Week ${status.plan.week} of 6 · done for today" to "${status.plan.name} is logged. Recover well."
                 is com.gymcoach.data.ProgramStatus.Rest -> "Week ${status.week} of 6 · rest day" to status.note
@@ -189,6 +192,24 @@ private fun ProgramHomeCard(
             }
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(detail, style = MaterialTheme.typography.bodySmall)
+            val today = when (status) {
+                is com.gymcoach.data.ProgramStatus.Next -> status.plan
+                is com.gymcoach.data.ProgramStatus.DoneToday -> status.plan
+                else -> null
+            }
+            if (today != null) {
+                val ticks by androidx.compose.runtime.remember(program.id) { repo.programTicks(program.id) }
+                    .collectAsStateWithLifecycle(initialValue = com.gymcoach.data.ProgramTicks())
+                Spacer(Modifier.size(8.dp))
+                com.gymcoach.ui.program.DayChecklist(
+                    program = program,
+                    day = today,
+                    date = null,
+                    finished = status is com.gymcoach.data.ProgramStatus.DoneToday,
+                    ticks = ticks,
+                    showHeader = false,
+                )
+            }
             Spacer(Modifier.size(8.dp))
             LinearProgressIndicator(
                 progress = { (finished.size.toFloat() / total).coerceIn(0f, 1f) },

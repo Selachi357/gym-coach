@@ -1,6 +1,7 @@
 package com.gymcoach.ui.workout
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -66,6 +67,7 @@ fun WorkoutScreen(
     sessionId: Long,
     addExercise: () -> Unit,
     openExercise: (Long) -> Unit,
+    openTimer: () -> Unit,
     close: () -> Unit,
 ) {
     val repo = LocalRepository.current
@@ -104,6 +106,9 @@ fun WorkoutScreen(
                 }) { Text("Finish") }
             },
         )
+        Box(Modifier.padding(horizontal = 16.dp).padding(top = 8.dp)) {
+            com.gymcoach.ui.timer.RestTimerBar(openTimer)
+        }
         LazyColumn(
             modifier = Modifier.fillMaxSize().imePadding(),
             contentPadding = PaddingValues(16.dp),
@@ -150,6 +155,8 @@ fun WorkoutScreen(
                     sets = sets.filter { it.exerciseId == exercise.id },
                     onLog = { weight, reps, effort, distance ->
                         scope.launch { repo.logSet(sessionId, exercise.id, weight, reps, effort, distance) }
+                        // Rest starts by itself after a strength set.
+                        if (!exercise.isCardio) com.gymcoach.ui.timer.Timers.startRest()
                     },
                     onDeleteSet = { set -> scope.launch { repo.deleteSet(set) } },
                     onTooHard = {

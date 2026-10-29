@@ -173,6 +173,13 @@ interface GymDao {
     @Query("SELECT * FROM sessions WHERE programId = :programId AND endedAt IS NOT NULL")
     suspend fun getFinishedProgramSessions(programId: Long): List<WorkoutSession>
 
+    @Query(
+        "SELECT DISTINCT s.programWeek AS week, s.programDay AS day, e.name AS name FROM sets st " +
+            "JOIN sessions s ON s.id = st.sessionId JOIN exercises e ON e.id = st.exerciseId " +
+            "WHERE s.programId = :programId AND s.programWeek IS NOT NULL AND s.programDay IS NOT NULL"
+    )
+    fun loggedProgramExercises(programId: Long): Flow<List<LoggedProgramExercise>>
+
     @Query("SELECT * FROM session_exercises WHERE sessionId = :sessionId ORDER BY position")
     fun sessionPlans(sessionId: Long): Flow<List<SessionExercise>>
 
@@ -210,3 +217,6 @@ interface GymDao {
 }
 
 data class BestWeight(val exerciseId: Long, val best: Double)
+
+/** An exercise with at least one set logged on a program day. */
+data class LoggedProgramExercise(val week: Int, val day: Int, val name: String)

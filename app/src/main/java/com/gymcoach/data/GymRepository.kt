@@ -94,6 +94,42 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
         gearPicks.value = next
     }
 
+    // Exercises ticked off by hand in the program plan, one "programId week day name" per line.
+    private val checksFile = File(saveDir, "checks.txt")
+
+    private val programChecks = MutableStateFlow(
+        runCatching { checksFile.readLines().map { it.trim() }.filter { it.isNotEmpty() }.toSet() }.getOrDefault(emptySet()),
+    )
+
+    /** Ticks or unticks one exercise of a program day. */
+    suspend fun toggleCheck(programId: Long, week: Int, day: Int, exercise: String) {
+        val key = checkKey(programId, week, day, exercise)
+        val next = if (key in programChecks.value) programChecks.value - key else programChecks.value + key
+        withContext(Dispatchers.IO) { checksFile.writeText(next.joinToString("\n")) }
+        programChecks.value = next
+    }
+
+    /**
+     * Ticked exercises of a program as (week, day, exercise name): ticked by hand, or ticked
+     * automatically once a set of it is logged on that program day.
+     */
+    fun programTicks(programId: Long): Flow<ProgramTicks> =
+        combine(programChecks, dao.loggedProgramExercises(programId)) { checks, logged ->
+            val prefix = "$programId "
+            ProgramTicks(
+                manual = checks.filter { it.startsWith(prefix) }.mapNotNull { line ->
+                    val p = line.removePrefix(prefix).split(' ', limit = 3)
+                    val w = p.getOrNull(0)?.toIntOrNull()
+                    val d = p.getOrNull(1)?.toIntOrNull()
+                    val n = p.getOrNull(2)
+                    if (w != null && d != null && n != null) Triple(w, d, n) else null
+                }.toSet(),
+                logged = logged.map { Triple(it.week, it.day, it.name) }.toSet(),
+            )
+        }
+
+    private fun checkKey(programId: Long, week: Int, day: Int, exercise: String) = "$programId $week $day $exercise"
+
     private val cityState = MutableStateFlow(runCatching { City.decode(cityFile.readText()) }.getOrDefault(CityState()))
     val city: StateFlow<CityState> = cityState
 
@@ -612,4 +648,13 @@ data class GameState(
 ) {
     val tier: HeroTier get() = HeroTier.forLevel(hero.level)
     val unlockedGear: List<Gear> get() = Gear.entries.filter { it.unlocked(progress) }
+}
+
+/** Which exercises of a program are ticked, as (week, day, exercise name). */
+data class ProgramTicks(
+    val manual: Set<Triple<Int, Int, String>> = emptySet(),
+    val logged: Set<Triple<Int, Int, String>> = emptySet(),
+) {
+    fun isTicked(week: Int, day: Int, name: String) = Triple(week, day, name).let { it in manual || it in logged }
+    fun isLogged(week: Int, day: Int, name: String) = Triple(week, day, name) in logged
 }

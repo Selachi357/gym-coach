@@ -71,6 +71,7 @@ fun GymCoachRoot() {
     val backStack by nav.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
     val showBottomBar = tabs.any { it.route == currentRoute }
+    com.gymcoach.ui.timer.TimerAlarm()
 
     Scaffold(
         contentWindowInsets = WindowInsets.navigationBars,
@@ -108,11 +109,13 @@ fun GymCoachRoot() {
                     openProgram = { nav.navigate("program") },
                     openHero = { nav.navigateTab("hero") },
                     openSettings = { nav.navigate("settings") },
+                    openTimer = { nav.navigate("timer") },
                 )
             }
             composable("program") {
                 ProgramScreen(back = { nav.popBackStack() }, openGuide = { nav.navigate("guide") })
             }
+            composable("timer") { com.gymcoach.ui.timer.TimerScreen(back = { nav.popBackStack() }) }
             composable("guide") { GuideScreen(back = { nav.popBackStack() }) }
             composable("settings") { SettingsScreen(back = { nav.popBackStack() }) }
             composable("hero") { HeroScreen(openDefender = { nav.navigate("defend") }, openCity = { nav.navigate("city") }) }
@@ -131,6 +134,7 @@ fun GymCoachRoot() {
                     sessionId = id,
                     addExercise = { nav.navigate(Routes.picker(id)) },
                     openExercise = { nav.navigate(Routes.exercise(it)) },
+                    openTimer = { nav.navigate("timer") },
                     close = { nav.popBackStack("home", inclusive = false) },
                 )
             }
