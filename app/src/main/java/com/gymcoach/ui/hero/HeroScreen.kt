@@ -42,6 +42,15 @@ import com.gymcoach.game.Contract
 import com.gymcoach.game.Contracts
 import com.gymcoach.game.Gear
 import com.gymcoach.game.Slot
+import com.gymcoach.game.Res
+import com.gymcoach.game.Shop
+import com.gymcoach.game.ShopItem
+import com.gymcoach.game.ShopKind
+import java.time.LocalDate
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.KeyboardType
 import com.gymcoach.game.Boss
 import com.gymcoach.game.BossFight
 import com.gymcoach.game.BossStatus
@@ -104,11 +113,15 @@ fun PixelBar(progress: Float, color: Color, modifier: Modifier = Modifier, segme
 fun HeroBanner(onClick: () -> Unit) {
     val repo = LocalRepository.current
     val game by repo.game.collectAsStateWithLifecycle(initialValue = null)
+    val city by repo.city.collectAsStateWithLifecycle()
     val h = game?.hero ?: return
     val fight = game?.realm?.campaign?.current
     RetroPanel(Modifier.clickable(onClick = onClick)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            HeroSprite(game?.gear.orEmpty(), 72.dp)
+            Box(contentAlignment = Alignment.BottomEnd) {
+                HeroSprite(game?.gear.orEmpty(), 72.dp, hair = city.hair)
+                city.pet?.let { PixelSprite(petSprite(it), cityPalette, 28.dp) }
+            }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 PixelText(h.rank.title.uppercase(), 11.sp, Retro.gold)
@@ -141,7 +154,7 @@ fun HeroBanner(onClick: () -> Unit) {
     }
 }
 
-private enum class RealmTab { HERO, BOSS, VOYAGE, VILLAGE, DEFEND }
+private enum class RealmTab { HERO, BOSS, VOYAGE, VILLAGE, DEFEND, SHOP }
 
 @Composable
 fun HeroScreen(openDefender: () -> Unit, openCity: () -> Unit) {
@@ -162,12 +175,14 @@ fun HeroScreen(openDefender: () -> Unit, openCity: () -> Unit) {
             when (tab) {
                 RealmTab.HERO -> heroItems(
                     g,
+                    city,
                     onContract = { c -> scope.launch { repo.chooseContract(c) } },
                     onEquip = { gear -> scope.launch { repo.equip(gear) } },
                 )
                 RealmTab.BOSS -> campaignItems(g.realm.campaign)
                 RealmTab.VOYAGE -> voyageItems(g.realm.voyage)
                 RealmTab.VILLAGE -> villageItems(city, g.training, openCity, openDefender)
+                RealmTab.SHOP -> shopItems(g, city) { action -> scope.launch { repo.updateCity(action) } }
                 RealmTab.DEFEND -> defendItems(Loadout.from(g.hero, g.realm, City.defence(city), g.trainedToday), openDefender)
             }
         }
@@ -178,7 +193,7 @@ fun HeroScreen(openDefender: () -> Unit, openCity: () -> Unit) {
 private fun PixelTabs(selected: RealmTab, onSelect: (RealmTab) -> Unit) {
     Row(
         Modifier.fillMaxWidth().background(Retro.night).padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         RealmTab.entries.forEach { t ->
             val on = t == selected
@@ -191,15 +206,15 @@ private fun PixelTabs(selected: RealmTab, onSelect: (RealmTab) -> Unit) {
                     .padding(vertical = 10.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                PixelText(t.name, 7.sp, if (on) Retro.night else Retro.parchment)
+                PixelText(t.name, 6.sp, if (on) Retro.night else Retro.parchment)
             }
         }
     }
 }
 
-private fun LazyListScope.heroItems(g: GameState, onContract: (Contract) -> Unit, onEquip: (Gear) -> Unit) {
+private fun LazyListScope.heroItems(g: GameState, city: CityState, onContract: (Contract) -> Unit, onEquip: (Gear) -> Unit) {
     val h = g.hero
-    item { CharacterSheet(g) }
+    item { CharacterSheet(g, city) }
     item { BonfirePanel(g.bonfire) }
     item { ContractPanel(g.contracts, g.weeklyTarget, onContract) }
     item { AttributesPanel(g) }
@@ -410,6 +425,143 @@ private fun LazyListScope.defendItems(l: Loadout, openDefender: () -> Unit) {
     }
 }
 
+private fun LazyListScope.shopItems(g: GameState, city: CityState, act: ((CityState, TrainingTotals) -> CityState) -> Unit) {
+    val gold = City.treasury(city, g.training).gold
+    val tokens = Shop.tokensLeft(g.tokensEarned, city.rewards)
+    item {
+        RetroPanel {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                PixelText("THE ROYAL MARKET", 12.sp, Retro.gold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ResLine(Res(gold = gold), Retro.gold)
+                    Spacer(Modifier.width(12.dp))
+                    PixelBadge(Badge.CROWN, unlocked = true, size = 14.dp)
+                    Spacer(Modifier.width(4.dp))
+                    PixelText("$tokens ROYAL TOKENS", 8.sp, Retro.parchment)
+                }
+                PixelText(
+                    "Gold is plentiful: it buys looks and companions, never progress. Royal tokens are rare: " +
+                        "they come from bonfire milestones and every 5 contracts, and pay for real-life rewards you set yourself.",
+                    7.sp, Retro.dim,
+                )
+            }
+        }
+    }
+    item { PixelText("COMPANIONS", 12.sp, Retro.gold) }
+    items(ShopItem.entries.filter { it.kind == ShopKind.PET }, key = { it.name }) { item ->
+        ShopRow(item, city, g.training, act) { PixelSprite(petSprite(item), cityPalette, 40.dp) }
+    }
+    item { PixelText("BARBER", 12.sp, Retro.gold) }
+    items(ShopItem.entries.filter { it.kind == ShopKind.HAIR }, key = { it.name }) { item ->
+        ShopRow(item, city, g.training, act) { HeroSprite(g.gear, 40.dp, hair = item) }
+    }
+    item { PixelText("CHARMS", 12.sp, Retro.gold) }
+    item {
+        ShopRow(ShopItem.EMBER_CHARM, city, g.training, act) { BonfireSprite(1, 40.dp) }
+    }
+    item {
+        PixelText("CHARMS LEFT: ${city.charms - g.bonfire.charmsUsed} · USED: ${g.bonfire.charmsUsed}", 7.sp, Retro.dim)
+    }
+    item { PixelText("REAL-LIFE REWARDS", 12.sp, Retro.gold) }
+    item { RewardsPanel(city, g.tokensEarned, act) }
+}
+
+@Composable
+private fun ShopRow(
+    item: ShopItem,
+    city: CityState,
+    training: TrainingTotals,
+    act: ((CityState, TrainingTotals) -> CityState) -> Unit,
+    picture: @Composable () -> Unit,
+) {
+    val owned = item in city.owned
+    val worn = city.pet == item || city.hair == item
+    RetroPanel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { picture() }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                PixelText(item.title.uppercase(), 8.sp, if (worn) Retro.gold else Retro.parchment)
+                PixelText(item.description, 6.sp, Retro.dim)
+                if (!owned || item.kind == ShopKind.CHARM) ResLine(Res(gold = item.gold), Retro.gold)
+            }
+            Spacer(Modifier.width(6.dp))
+            when {
+                worn -> RetroOutlinedButton(onClick = { act { s, _ -> City.wear(s, item.kind, null) } }) { Text("Off") }
+                owned && item.kind != ShopKind.CHARM -> RetroButton(onClick = { act { s, _ -> City.wear(s, item.kind, item) } }) { Text("Use") }
+                else -> RetroButton(
+                    onClick = { act { s, t -> if (City.whyNotBuy(s, t, item) == null) City.buy(s, t, item) else s } },
+                    enabled = City.whyNotBuy(city, training, item) == null,
+                ) { Text("Buy") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RewardsPanel(city: CityState, tokensEarned: Int, act: ((CityState, TrainingTotals) -> CityState) -> Unit) {
+    var name by rememberSaveable { mutableStateOf("") }
+    var price by rememberSaveable { mutableStateOf("1") }
+    val left = Shop.tokensLeft(tokensEarned, city.rewards)
+    RetroPanel {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (city.rewards.isEmpty()) PixelText("Set a reward worth working for. Claim it when you have the tokens.", 7.sp, Retro.dim)
+            city.rewards.forEachIndexed { i, r ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        PixelText(r.name.uppercase(), 8.sp, if (r.claimedOn != null) Retro.xp else Retro.parchment)
+                        PixelText(
+                            if (r.claimedOn != null) "CLAIMED ${r.claimedOn}" else "${r.tokens} TOKEN${if (r.tokens > 1) "S" else ""}",
+                            7.sp, Retro.dim,
+                        )
+                    }
+                    if (r.claimedOn == null) {
+                        TextButton(onClick = { act { s, _ -> Shop.removeReward(s, i) } }) { Text("×") }
+                        RetroButton(
+                            onClick = { act { s, _ -> Shop.claim(s, i, tokensEarned, LocalDate.now().toString()) } },
+                            enabled = left >= r.tokens,
+                        ) { Text("Claim") }
+                    }
+                }
+            }
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it.take(40) },
+                label = { Text("Your reward") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = price,
+                    onValueChange = { price = it.filter(Char::isDigit).take(2) },
+                    label = { Text("Tokens") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.width(110.dp),
+                )
+                Spacer(Modifier.width(10.dp))
+                RetroButton(
+                    onClick = {
+                        val n = price.toIntOrNull() ?: 0
+                        act { s, _ -> Shop.addReward(s, name, n) }
+                        name = ""
+                    },
+                    enabled = name.isNotBlank() && (price.toIntOrNull() ?: 0) > 0,
+                ) { Text("Add") }
+            }
+            PixelText("IDEAS", 7.sp, Retro.dim)
+            Shop.SUGGESTIONS.filter { idea -> city.rewards.none { it.name == idea.name } }.forEach { idea ->
+                PixelText(
+                    "+ ${idea.name} (${idea.tokens})",
+                    7.sp, Retro.parchment,
+                    Modifier.clickable { act { s, _ -> Shop.addReward(s, idea.name, idea.tokens) } }.padding(vertical = 4.dp),
+                )
+            }
+        }
+    }
+}
+
 private fun LazyListScope.villageItems(city: CityState, training: TrainingTotals, openCity: () -> Unit, openDefender: () -> Unit) {
     item {
         RetroPanel {
@@ -520,13 +672,16 @@ private fun ContractPanel(c: Contracts, weeklyTarget: Int, onContract: (Contract
 }
 
 @Composable
-private fun CharacterSheet(g: GameState) {
+private fun CharacterSheet(g: GameState, city: CityState) {
     val h = g.hero
     RetroPanel {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
             PixelText(g.tier.title.uppercase(), 8.sp, Retro.dim)
             Spacer(Modifier.size(8.dp))
-            HeroSprite(g.gear, 160.dp)
+            Row(verticalAlignment = Alignment.Bottom) {
+                HeroSprite(g.gear, 160.dp, hair = city.hair)
+                city.pet?.let { PixelSprite(petSprite(it), cityPalette, 64.dp) }
+            }
             Spacer(Modifier.size(12.dp))
             PixelText(h.rank.title.uppercase(), 14.sp, Retro.gold)
             Spacer(Modifier.size(6.dp))

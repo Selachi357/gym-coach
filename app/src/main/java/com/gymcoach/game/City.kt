@@ -85,6 +85,13 @@ data class CityState(
     val spent: Res = Res(),
     /** Plunder brought home from Castle Defender. */
     val loot: Res = Res(),
+    /** Shop items bought (not counting charms). */
+    val owned: Set<ShopItem> = emptySet(),
+    /** Ember charms bought in total; the bonfire works out how many are used. */
+    val charms: Int = 0,
+    val pet: ShopItem? = null,
+    val hair: ShopItem? = null,
+    val rewards: List<RealReward> = emptyList(),
 )
 
 /**
@@ -251,11 +258,45 @@ object City {
         return Res(more(base.gold), more(base.wood), more(base.stone), more(base.food))
     }
 
+    /** Null when [item] can be bought, otherwise the reason it can't. */
+    fun whyNotBuy(state: CityState, t: TrainingTotals, item: ShopItem): String? = when {
+        item.kind != ShopKind.CHARM && item in state.owned -> "Already yours"
+        treasury(state, t).gold < item.gold -> "Not enough gold"
+        else -> null
+    }
+
+    /** Buys [item] with village gold. Pets and hair are put on straight away. */
+    fun buy(state: CityState, t: TrainingTotals, item: ShopItem): CityState {
+        require(whyNotBuy(state, t, item) == null)
+        val paid = state.copy(spent = state.spent + Res(gold = item.gold))
+        return when (item.kind) {
+            ShopKind.CHARM -> paid.copy(charms = state.charms + 1)
+            ShopKind.PET -> paid.copy(owned = state.owned + item, pet = item)
+            ShopKind.HAIR -> paid.copy(owned = state.owned + item, hair = item)
+        }
+    }
+
+    /** Switches pet or hair to an owned item, or back to none with [kind] and null. */
+    fun wear(state: CityState, kind: ShopKind, item: ShopItem?): CityState {
+        if (item != null && (item !in state.owned || item.kind != kind)) return state
+        return when (kind) {
+            ShopKind.PET -> state.copy(pet = item)
+            ShopKind.HAIR -> state.copy(hair = item)
+            ShopKind.CHARM -> state
+        }
+    }
+
     fun encode(state: CityState): String = buildString {
         state.buildings.forEach { appendLine("b ${it.type.name} ${it.x} ${it.y} ${it.level} ${it.builtAt}") }
         state.cleared.forEach { (x, y) -> appendLine("c $x $y") }
         appendLine("s ${state.spent.gold} ${state.spent.wood} ${state.spent.stone} ${state.spent.food}")
         appendLine("l ${state.loot.gold} ${state.loot.wood} ${state.loot.stone} ${state.loot.food}")
+        state.owned.forEach { appendLine("o ${it.name}") }
+        appendLine("m ${state.charms}")
+        state.pet?.let { appendLine("p ${it.name}") }
+        state.hair?.let { appendLine("h ${it.name}") }
+        // Reward names can hold spaces, so they go last on the line.
+        state.rewards.forEach { appendLine("r ${it.tokens} ${it.claimedOn ?: "-"} ${it.name}") }
     }
 
     /** Reads [encode]'s format. Unknown or broken lines are skipped so a bad save never crashes the app. */
@@ -264,6 +305,11 @@ object City {
         val cleared = mutableSetOf<Pair<Int, Int>>()
         var spent = Res()
         var loot = Res()
+        val owned = mutableSetOf<ShopItem>()
+        var charms = 0
+        var pet: ShopItem? = null
+        var hair: ShopItem? = null
+        val rewards = mutableListOf<RealReward>()
         for (line in text.lines()) {
             val p = line.trim().split(' ')
             runCatching {
@@ -272,10 +318,15 @@ object City {
                     "c" -> cleared += p[1].toInt() to p[2].toInt()
                     "s" -> spent = Res(p[1].toInt(), p[2].toInt(), p[3].toInt(), p[4].toInt())
                     "l" -> loot = Res(p[1].toInt(), p[2].toInt(), p[3].toInt(), p[4].toInt())
+                    "o" -> owned += ShopItem.valueOf(p[1])
+                    "m" -> charms = p[1].toInt()
+                    "p" -> pet = ShopItem.valueOf(p[1])
+                    "h" -> hair = ShopItem.valueOf(p[1])
+                    "r" -> rewards += RealReward(p.drop(3).joinToString(" "), p[1].toInt(), p[2].takeIf { it != "-" })
                 }
             }
         }
         if (buildings.none { it.type == BuildingType.TOWN_HALL }) return CityState()
-        return CityState(buildings, cleared, spent, loot)
+        return CityState(buildings, cleared, spent, loot, owned, charms, pet, hair, rewards)
     }
 }

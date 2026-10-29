@@ -5,13 +5,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.gymcoach.game.BuildingType
+import com.gymcoach.game.ShopItem
 import com.gymcoach.game.Terrain
 
 /**
  * 16 × 16 village sprites. Shapes are painted without outlines; [outlined] then adds a dark outline
  * around every shape, which gives the classic 16-bit look.
  */
-private class Sprite16 {
+internal class Sprite16 {
     val cells = Array(16) { CharArray(16) { '.' } }
 
     fun set(x: Int, y: Int, c: Char) {
@@ -49,7 +50,7 @@ private class Sprite16 {
     }
 }
 
-private fun sprite(block: Sprite16.() -> Unit): List<String> = Sprite16().apply(block).outlined()
+internal fun sprite(block: Sprite16.() -> Unit): List<String> = Sprite16().apply(block).outlined()
 
 private val buildingArt: Map<BuildingType, List<String>> by lazy {
     mapOf(
@@ -263,3 +264,44 @@ fun DrawScope.drawCityTile(
 
 /** A single building sprite for menus. */
 fun buildingSprite(type: BuildingType): List<String> = buildingArt.getValue(type)
+
+private val petArt: Map<ShopItem, List<String>> by lazy {
+    mapOf(
+        ShopItem.WOLF to sprite {
+            rect(3, 8, 11, 11, 'r'); rect(4, 9, 10, 11, 'R')
+            rect(10, 5, 13, 8, 'r'); set(10, 4, 'r'); set(12, 4, 'r'); set(12, 6, 'k'); set(14, 7, 'k'); set(13, 7, 'r')
+            rect(3, 12, 3, 14, 'R'); rect(5, 12, 5, 14, 'R'); rect(9, 12, 9, 14, 'R'); rect(11, 12, 11, 14, 'R')
+            rect(1, 7, 2, 8, 'r'); set(1, 6, 'r')
+            rect(4, 11, 10, 11, 'x')
+        },
+        ShopItem.RAVEN to sprite {
+            rect(5, 7, 10, 11, 'U'); rect(9, 4, 12, 7, 'U'); rect(13, 5, 14, 6, 'S'); set(11, 5, 'y')
+            rect(3, 8, 7, 10, 'u'); rect(2, 10, 4, 11, 'u')
+            rect(6, 12, 6, 14, 'S'); rect(9, 12, 9, 14, 'S')
+        },
+        ShopItem.FOX to sprite {
+            rect(3, 8, 10, 11, 'e'); rect(10, 5, 13, 8, 'e'); set(10, 3, 'e'); set(10, 4, 'e'); set(13, 4, 'e')
+            set(12, 6, 'k'); rect(13, 7, 14, 8, 'x'); rect(4, 11, 9, 11, 'x')
+            rect(0, 6, 3, 8, 'e'); set(0, 6, 'x'); set(0, 7, 'x')
+            rect(4, 12, 4, 14, 'O'); rect(9, 12, 9, 14, 'O')
+        },
+        ShopItem.CAT to sprite {
+            rect(4, 8, 10, 12, 'R'); rect(9, 4, 13, 8, 'R'); set(9, 3, 'R'); set(13, 3, 'R')
+            set(10, 5, 'c'); set(12, 5, 'c'); set(11, 7, 'o')
+            rect(2, 5, 2, 10, 'R'); set(3, 10, 'R')
+            rect(5, 13, 5, 14, 'R'); rect(9, 13, 9, 14, 'R'); rect(5, 9, 8, 10, 'r')
+        },
+        ShopItem.DRAGON to sprite {
+            rect(4, 8, 10, 12, 'c'); rect(5, 10, 9, 12, 'h')
+            rect(9, 4, 13, 8, 'c'); set(12, 5, 'e'); rect(13, 7, 14, 7, 'x')
+            rect(2, 5, 5, 8, 'F'); set(3, 4, 'F')
+            set(10, 3, 'y'); set(12, 3, 'y')
+            rect(0, 11, 3, 11, 'c'); set(0, 10, 'c')
+            rect(5, 13, 5, 14, 'F'); rect(9, 13, 9, 14, 'F')
+            set(15, 6, 'n')
+        },
+    )
+}
+
+/** A pet sprite for the shop and the hero's side. */
+fun petSprite(pet: ShopItem): List<String> = petArt.getValue(pet)

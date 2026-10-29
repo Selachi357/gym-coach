@@ -26,6 +26,7 @@ import com.gymcoach.game.Progress
 import com.gymcoach.game.CityState
 import com.gymcoach.game.HeroStats
 import com.gymcoach.game.Res
+import com.gymcoach.game.Shop
 import com.gymcoach.game.Slot
 import com.gymcoach.game.TrainingTotals
 import com.gymcoach.game.Realm
@@ -142,7 +143,8 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
         },
         contractChoices,
         gearPicks,
-    ) { inputs, choices, picks -> buildGame(inputs, choices, picks) }
+        cityState,
+    ) { inputs, choices, picks, city -> buildGame(inputs, choices, picks, city) }
 
     val hero: Flow<HeroStats> = game.map { it.hero }
 
@@ -150,9 +152,15 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
         GameInputs(dao.getFinishedSessions(), dao.getFinishedSets(), dao.allExercises(), dao.allGoals(), dao.getActiveProgram()),
         contractChoices.value,
         gearPicks.value,
+        cityState.value,
     )
 
-    private fun buildGame(inputs: GameInputs, choices: Map<LocalDate, Contract>, picks: Map<Slot, Gear>): GameState {
+    private fun buildGame(
+        inputs: GameInputs,
+        choices: Map<LocalDate, Contract>,
+        picks: Map<Slot, Gear>,
+        city: CityState,
+    ): GameState {
         val (sessions, sets, exercises, goals, program) = inputs
         val cardio = exercises.filter { it.isCardio }.map { it.id }.toSet()
         val mobility = exercises.filter { it.muscleGroup == "Mobility" }.map { it.id }.toSet()
@@ -181,7 +189,7 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
                 if (ProgramPlanner.onboardDay(i / 7 + 1, i % 7 + 1) == null) restDays += date else planDays += date
             }
         }
-        val bonfire = BonfireCalculator.compute(records.map { it.date }, restDays, planDays, today)
+        val bonfire = BonfireCalculator.compute(records.map { it.date }, restDays, planDays, today, city.charms)
         val contracts = BonfireCalculator.contracts(records, choices, weeklyTarget, today)
 
         val hero = HeroCalculator.compute(records, today, weeklyTarget, BonfireCalculator.bonusXp(bonfire, contracts))
@@ -213,6 +221,7 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
             heroClass = AttributeCalculator.heroClass(attributes),
             progress = progress,
             gear = Gear.equipped(progress, picks),
+            tokensEarned = Shop.tokensEarned(bonfire, contracts),
         )
     }
     fun finishedProgramSessions(programId: Long): Flow<List<WorkoutSession>> = dao.finishedProgramSessions(programId)
@@ -598,6 +607,8 @@ data class GameState(
     val progress: Progress,
     /** What the hero wears in each slot. */
     val gear: Map<Slot, Gear>,
+    /** Royal tokens earned in total; claimed rewards are taken off in the shop. */
+    val tokensEarned: Int,
 ) {
     val tier: HeroTier get() = HeroTier.forLevel(hero.level)
     val unlockedGear: List<Gear> get() = Gear.entries.filter { it.unlocked(progress) }

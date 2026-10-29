@@ -15,6 +15,7 @@ import com.gymcoach.R
 import com.gymcoach.game.Badge
 import com.gymcoach.game.Gear
 import com.gymcoach.game.Rank
+import com.gymcoach.game.ShopItem
 import com.gymcoach.game.Slot
 
 val PixelFont = FontFamily(Font(R.font.press_start_2p))
@@ -138,6 +139,7 @@ private data class Look(
     val shield: Color? = null,
     val crest: Color = Retro.gold,
     val cape: Color? = null,
+    val hair: Color = Color(0xFF6B3E26),
 )
 
 private fun lookFor(rank: Rank): Look = when (rank) {
@@ -238,9 +240,18 @@ private fun lookFor(gear: Map<Slot, Gear>): Look {
 @Composable
 fun HeroSprite(rank: Rank, size: Dp, modifier: Modifier = Modifier) = HeroSprite(lookFor(rank), size, modifier)
 
-/** The hero in the gear they wear. */
+fun hairColor(hair: ShopItem?): Color = when (hair) {
+    ShopItem.HAIR_BLOND -> Color(0xFFE8C860)
+    ShopItem.HAIR_RED -> Color(0xFFB8452A)
+    ShopItem.HAIR_BLACK -> Color(0xFF26222E)
+    ShopItem.HAIR_WHITE -> Color(0xFFDCDCE6)
+    else -> Color(0xFF6B3E26)
+}
+
+/** The hero in the gear they wear, with hair from the shop. */
 @Composable
-fun HeroSprite(gear: Map<Slot, Gear>, size: Dp, modifier: Modifier = Modifier) = HeroSprite(lookFor(gear), size, modifier)
+fun HeroSprite(gear: Map<Slot, Gear>, size: Dp, modifier: Modifier = Modifier, hair: ShopItem? = null) =
+    HeroSprite(lookFor(gear).copy(hair = hairColor(hair)), size, modifier)
 
 @Composable
 private fun HeroSprite(look: Look, size: Dp, modifier: Modifier = Modifier) {
@@ -264,7 +275,7 @@ private fun HeroSprite(look: Look, size: Dp, modifier: Modifier = Modifier) {
         'k' to Retro.night,
         's' to Color(0xFFF1C27D),
         'e' to Retro.night,
-        'h' to Color(0xFF6B3E26),
+        'h' to look.hair,
         't' to look.torso,
         'b' to look.belt,
         'l' to look.legs,

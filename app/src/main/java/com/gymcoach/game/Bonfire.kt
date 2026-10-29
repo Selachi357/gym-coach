@@ -28,6 +28,8 @@ data class Bonfire(
     val secondWindReady: Boolean,
     val secondWindsUsed: Int,
     val milestones: List<BonfireMilestone>,
+    /** Ember charms that saved the fire so far. */
+    val charmsUsed: Int = 0,
 ) {
     val next: BonfireMilestone? get() = BonfireMilestone.entries.firstOrNull { it.days > days }
     /** Size of the fire, 0 (cold) to 5 (eternal flame). */
@@ -70,14 +72,21 @@ data class Contracts(val thisWeek: ContractState, val completed: Int)
  * - A workout lights the day. So does a rest day in your plan.
  * - Without a calendar plan, up to two rest days after a workout keep the fire going.
  * - Miss a day and the fire drops to embers. Train the next day and Second Wind keeps your streak
- *   (once every 7 days). Miss again and the streak restarts. XP, levels and gear are never lost.
+ *   (once every 7 days). Miss again and the streak restarts, unless you have an Ember Charm from the shop.
+ *   XP, levels and gear are never lost.
  */
 object BonfireCalculator {
     const val CONTRACT_XP = 250
     const val CONTRACT_GOLD = 50
     private const val SECOND_WIND_COOLDOWN = 7L
 
-    fun compute(workouts: Collection<LocalDate>, plannedRest: Set<LocalDate>, planDays: Set<LocalDate>, today: LocalDate): Bonfire {
+    fun compute(
+        workouts: Collection<LocalDate>,
+        plannedRest: Set<LocalDate>,
+        planDays: Set<LocalDate>,
+        today: LocalDate,
+        charms: Int = 0,
+    ): Bonfire {
         val trained = workouts.toSet()
         val restToday = today in plannedRest
         val first = trained.minOrNull()
@@ -94,6 +103,7 @@ object BonfireCalculator {
         var embers: LocalDate? = null
         var lastSecondWind: LocalDate? = null
         var used = 0
+        var charmsUsed = 0
         var d: LocalDate = first
         while (!d.isAfter(today)) {
             if (active(d)) {
@@ -108,6 +118,10 @@ object BonfireCalculator {
                 val ready = lastSecondWind == null || ChronoUnit.DAYS.between(lastSecondWind, d) >= SECOND_WIND_COOLDOWN
                 if (embers == null && ready && streak > 0) {
                     embers = d
+                } else if (streak > 0 && charmsUsed < charms) {
+                    // An Ember Charm burns instead of the fire: the streak goes on, the missed day doesn't count.
+                    charmsUsed++
+                    embers = null
                 } else {
                     streak = 0
                     embers = null
@@ -125,6 +139,7 @@ object BonfireCalculator {
             secondWindReady = ready && embers == null,
             secondWindsUsed = used,
             milestones = BonfireMilestone.entries.filter { best >= it.days },
+            charmsUsed = charmsUsed,
         )
     }
 
