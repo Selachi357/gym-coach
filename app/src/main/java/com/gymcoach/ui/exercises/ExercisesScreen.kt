@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymcoach.coach.effortLabel
 import com.gymcoach.coach.formatKg
 import com.gymcoach.data.Exercise
+import com.gymcoach.data.isTimed
 import com.gymcoach.ui.GymTopBar
 import com.gymcoach.ui.LocalRepository
 import com.gymcoach.ui.describeSet
@@ -118,7 +119,7 @@ fun ExerciseDetailScreen(exerciseId: Long, openExercise: (Long) -> Unit, back: (
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                 Column(Modifier.fillMaxWidth().padding(16.dp)) {
                     Text("Your coach target", style = MaterialTheme.typography.labelLarge)
-                    Text(formatTarget(target.sets, target.reps, target.weightKg, ex.isCardio), style = MaterialTheme.typography.headlineSmall)
+                    Text(formatTarget(target.sets, target.reps, target.weightKg, ex.isCardio, ex.isTimed), style = MaterialTheme.typography.headlineSmall)
                 }
             }
 

@@ -30,6 +30,9 @@ interface GymDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertExercises(exercises: List<Exercise>)
 
+    @Update
+    suspend fun updateExercise(exercise: Exercise)
+
     // Targets
     @Query("SELECT * FROM targets")
     fun targets(): Flow<List<ExerciseTarget>>
@@ -152,6 +155,12 @@ interface GymDao {
     @Query("SELECT * FROM programs WHERE active = 1 ORDER BY startedAt DESC LIMIT 1")
     suspend fun getActiveProgram(): Program?
 
+    @Query("SELECT * FROM programs WHERE id = :id")
+    suspend fun getProgram(id: Long): Program?
+
+    @Update
+    suspend fun updateProgram(program: Program)
+
     @Query("UPDATE programs SET active = 0")
     suspend fun deactivatePrograms()
 
@@ -172,6 +181,25 @@ interface GymDao {
 
     @Update
     suspend fun updateSessionExercise(se: SessionExercise)
+
+    // Level-up system
+    @Query("SELECT * FROM sessions WHERE endedAt IS NOT NULL ORDER BY startedAt")
+    fun finishedSessions(): Flow<List<WorkoutSession>>
+
+    @Query("SELECT * FROM sessions WHERE endedAt IS NOT NULL ORDER BY startedAt")
+    suspend fun getFinishedSessions(): List<WorkoutSession>
+
+    @Query("SELECT st.* FROM sets st JOIN sessions s ON s.id = st.sessionId WHERE s.endedAt IS NOT NULL ORDER BY st.createdAt")
+    fun finishedSets(): Flow<List<SetEntry>>
+
+    @Query("SELECT st.* FROM sets st JOIN sessions s ON s.id = st.sessionId WHERE s.endedAt IS NOT NULL ORDER BY st.createdAt")
+    suspend fun getFinishedSets(): List<SetEntry>
+
+    @Query("SELECT * FROM exercises")
+    suspend fun allExercises(): List<Exercise>
+
+    @Query("SELECT * FROM goals")
+    suspend fun allGoals(): List<Goal>
 
     // Coach notes
     @Query("SELECT * FROM coach_notes ORDER BY createdAt DESC, id DESC LIMIT :limit")

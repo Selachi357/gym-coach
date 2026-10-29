@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -32,7 +33,10 @@ import com.gymcoach.ui.exercises.ExercisesScreen
 import com.gymcoach.ui.goals.GoalsScreen
 import com.gymcoach.ui.history.HistoryScreen
 import com.gymcoach.ui.history.SessionDetailScreen
+import com.gymcoach.ui.guide.GuideScreen
+import com.gymcoach.ui.hero.HeroScreen
 import com.gymcoach.ui.home.HomeScreen
+import com.gymcoach.ui.settings.SettingsScreen
 import com.gymcoach.ui.program.ProgramScreen
 import com.gymcoach.ui.workout.ExercisePickerScreen
 import com.gymcoach.ui.workout.WorkoutScreen
@@ -44,6 +48,7 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 private val tabs = listOf(
     Tab("home", "Home", Icons.Filled.Home),
     Tab("exercises", "Exercises", Icons.Filled.FitnessCenter),
+    Tab("hero", "Hero", Icons.Filled.Shield),
     Tab("goals", "Goals", Icons.Filled.EmojiEvents),
     Tab("history", "History", Icons.Filled.History),
 )
@@ -85,9 +90,16 @@ fun GymCoachRoot() {
                     openWorkout = { nav.navigate(Routes.workout(it)) },
                     openGoals = { nav.navigateTab("goals") },
                     openProgram = { nav.navigate("program") },
+                    openHero = { nav.navigateTab("hero") },
+                    openSettings = { nav.navigate("settings") },
                 )
             }
-            composable("program") { ProgramScreen(back = { nav.popBackStack() }) }
+            composable("program") {
+                ProgramScreen(back = { nav.popBackStack() }, openGuide = { nav.navigate("guide") })
+            }
+            composable("guide") { GuideScreen(back = { nav.popBackStack() }) }
+            composable("settings") { SettingsScreen(back = { nav.popBackStack() }) }
+            composable("hero") { HeroScreen() }
             composable("exercises") {
                 ExercisesScreen(openExercise = { nav.navigate(Routes.exercise(it)) })
             }

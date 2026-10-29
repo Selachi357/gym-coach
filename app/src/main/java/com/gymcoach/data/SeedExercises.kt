@@ -23,17 +23,17 @@ object SeedExercises {
         Exercise(
             name = "Dumbbell Bench Press", muscleGroup = "Chest", equipment = "Dumbbells", isBodyweight = false,
             instructions = """
-                Sit on the bench with a dumbbell on each thigh, then lie back and bring them to chest level.
-                Press the dumbbells up until your arms are straight, palms facing forward.
-                Lower them slowly until your elbows are just below the bench.
-                Press back up, bringing the dumbbells slightly together at the top.
+                Sit on the end of the bench with dumbbells on your thighs, then lie back and bring them to your chest.
+                Feet flat on the floor, shoulder blades pinched together and down.
+                Press up until your arms are straight above your chest.
+                Lower until the dumbbells are beside your chest, elbows at about 45° from your body, not flared out to 90°.
             """.trimIndent(),
             tips = """
                 The weight shown is per dumbbell.
-                Control the way down; that's where a lot of the growth comes from.
-                Keep your wrists straight, not bent back.
+                Control the way down (2–3 seconds) and breathe out as you press.
+                Put the dumbbells back in the rack after every set; never leave them loose.
             """.trimIndent(),
-            easierName = "Push-Up", harderName = "Bench Press", startWeightKg = 10.0,
+            easierName = "Push-Up", harderName = "Bench Press", startWeightKg = 12.0, startReps = 12,
         ),
         Exercise(
             name = "Incline Dumbbell Press", muscleGroup = "Chest", equipment = "Dumbbells", isBodyweight = false,
@@ -52,14 +52,14 @@ object SeedExercises {
         Exercise(
             name = "Push-Up", muscleGroup = "Chest", equipment = "Bodyweight", isBodyweight = true,
             instructions = """
-                Start in a high plank, hands just wider than your shoulders.
-                Keep your body in a straight line from head to heels.
-                Lower your chest to just above the floor.
+                Hands just wider than shoulders, body straight like a plank.
+                Lower until your chest is a fist's height from the floor.
                 Push back up to straight arms.
             """.trimIndent(),
             tips = """
-                Squeeze your glutes and abs so your hips don't sag.
-                Elbows point back at about 45 degrees, not straight out.
+                Too hard? Put your hands on the bench, or do knee push-ups.
+                Too easy? Slow the way down to 3 seconds.
+                Squeeze your glutes and stomach so your hips don't sag.
             """.trimIndent(),
             easierName = "Knee Push-Up", harderName = "Decline Push-Up", startReps = 8,
         ),
@@ -108,16 +108,29 @@ object SeedExercises {
         Exercise(
             name = "One-Arm Dumbbell Row", muscleGroup = "Back", equipment = "Dumbbells", isBodyweight = false,
             instructions = """
-                Put one knee and one hand on a bench, other foot on the floor.
-                Hold the dumbbell with your free hand, arm straight.
-                Pull the dumbbell to your hip.
-                Lower it slowly. Do all reps, then switch sides.
+                Put one knee and the same-side hand on the bench, back flat like a table.
+                Hold the dumbbell in the other hand, arm hanging straight.
+                Pull the dumbbell to your hip, elbow close to your body.
+                Lower slowly until the arm is straight again. Do all reps, then switch sides.
             """.trimIndent(),
             tips = """
-                Keep your back flat and parallel to the floor.
+                Don't twist your torso.
                 Pull with your elbow, not your hand.
             """.trimIndent(),
-            harderName = "Barbell Row", startWeightKg = 12.0,
+            harderName = "Barbell Row", startWeightKg = 14.0, startReps = 12,
+        ),
+        Exercise(
+            name = "Chest-Supported Dumbbell Row", muscleGroup = "Back", equipment = "Dumbbells + incline bench", isBodyweight = false,
+            instructions = """
+                Set the bench to about 30–45°. Lie face-down on it with your chest on the pad.
+                Let the dumbbells hang straight down.
+                Pull them up toward your lower ribs, squeezing your shoulder blades together, then lower.
+            """.trimIndent(),
+            tips = """
+                The bench supports you, which makes this one of the safest rows on a moving ship.
+                Weight is per dumbbell. Keep your chest on the pad.
+            """.trimIndent(),
+            easierName = "One-Arm Dumbbell Row", startWeightKg = 10.0, startReps = 12,
         ),
         Exercise(
             name = "Dumbbell Pullover", muscleGroup = "Back", equipment = "Dumbbell + bench", isBodyweight = false,
@@ -154,16 +167,17 @@ object SeedExercises {
         Exercise(
             name = "Goblet Squat", muscleGroup = "Legs", equipment = "Dumbbell", isBodyweight = false,
             instructions = """
-                Hold one dumbbell vertically against your chest.
-                Stand with feet shoulder-width apart.
-                Squat down between your knees, keeping your chest up.
-                Stand back up.
+                Hold one dumbbell vertically against your chest, both hands under the top end.
+                Feet shoulder-width, toes turned out slightly.
+                Sit down between your heels, chest up, until your thighs are at least parallel to the floor.
+                Push through your whole foot to stand up.
             """.trimIndent(),
             tips = """
-                Elbows go inside your knees at the bottom.
-                Great for learning squat form.
+                Mistakes: knees caving inward, heels lifting. Push your knees out over your toes.
+                Move slowly on the way down (2–3 seconds) and breathe out on the way up.
+                When the ship is rolling noticeably, skip heavy squats.
             """.trimIndent(),
-            easierName = "Bodyweight Squat", harderName = "Back Squat", startWeightKg = 12.0,
+            easierName = "Bodyweight Squat", harderName = "Back Squat", startWeightKg = 14.0, startReps = 12,
         ),
         Exercise(
             name = "Bodyweight Squat", muscleGroup = "Legs", equipment = "Bodyweight", isBodyweight = true,
@@ -210,16 +224,16 @@ object SeedExercises {
         Exercise(
             name = "Dumbbell Romanian Deadlift", muscleGroup = "Legs", equipment = "Dumbbells", isBodyweight = false,
             instructions = """
-                Hold a dumbbell in each hand in front of your thighs.
-                Keep a slight knee bend and push your hips back.
-                Lower the dumbbells along your legs until you feel the hamstring stretch.
-                Squeeze your glutes to stand up.
+                Stand tall holding dumbbells in front of your thighs, knees slightly bent.
+                Push your hips backward as if closing a car door with your backside. The dumbbells slide down your thighs.
+                Keep your back flat; stop when you feel a strong stretch in your hamstrings, usually around mid-shin.
+                Drive your hips forward to stand back up.
             """.trimIndent(),
             tips = """
+                Mistake: rounding your back or turning it into a squat. Knees stay almost still.
                 Weight is per dumbbell.
-                Back flat, chest proud.
             """.trimIndent(),
-            harderName = "Romanian Deadlift", startWeightKg = 10.0,
+            harderName = "Romanian Deadlift", startWeightKg = 12.0, startReps = 12,
         ),
         Exercise(
             name = "Deadlift", muscleGroup = "Legs", equipment = "Barbell", isBodyweight = false,
@@ -266,6 +280,32 @@ object SeedExercises {
             startWeightKg = 20.0, startReps = 12,
         ),
 
+        Exercise(
+            name = "Glute Bridge", muscleGroup = "Legs", equipment = "Dumbbell + floor", isBodyweight = false,
+            instructions = """
+                Lie on your back, knees bent, feet flat and hip-width apart, dumbbell resting on your hip bones.
+                Push through your heels and lift your hips until your body is straight from knees to shoulders.
+                Squeeze your glutes for 1 second at the top, then lower.
+            """.trimIndent(),
+            tips = """
+                Mistake: arching your lower back at the top. The movement comes from the hips.
+                Hold the dumbbell with both hands so it can't roll.
+            """.trimIndent(),
+            startWeightKg = 10.0, startReps = 15,
+        ),
+        Exercise(
+            name = "Split Squat", muscleGroup = "Legs", equipment = "Dumbbells", isBodyweight = false,
+            instructions = """
+                Take a long step forward and stay in that position, back heel lifted. Hold dumbbells at your sides.
+                Lower straight down until your back knee nearly touches the floor.
+                Push through the front foot to come back up. Do all reps, then switch legs.
+            """.trimIndent(),
+            tips = """
+                In a swell, hold the bench for balance instead of holding dumbbells.
+                Keep your torso upright and the front knee over your foot.
+            """.trimIndent(),
+            easierName = "Bodyweight Squat", harderName = "Walking Lunge", startWeightKg = 6.0, startReps = 10,
+        ),
         // Shoulders
         Exercise(
             name = "Overhead Press", muscleGroup = "Shoulders", equipment = "Barbell", isBodyweight = false,
@@ -284,15 +324,16 @@ object SeedExercises {
         Exercise(
             name = "Dumbbell Shoulder Press", muscleGroup = "Shoulders", equipment = "Dumbbells", isBodyweight = false,
             instructions = """
-                Sit on a bench with back support, dumbbells at shoulder height.
-                Press the dumbbells up until your arms are straight.
-                Lower them back to shoulder height slowly.
+                Sit on a bench with an upright back support, dumbbells at shoulder height, palms forward.
+                Press up until your arms are straight, without banging the dumbbells together.
+                Lower back to shoulder height.
             """.trimIndent(),
             tips = """
+                Keep your lower back against the support.
                 Weight is per dumbbell.
-                Keep your lower back against the pad.
+                Seated is the safe choice when the ship is rolling; skip standing overhead work then.
             """.trimIndent(),
-            harderName = "Overhead Press", startWeightKg = 8.0,
+            harderName = "Overhead Press", startWeightKg = 8.0, startReps = 12,
         ),
         Exercise(
             name = "Lateral Raise", muscleGroup = "Shoulders", equipment = "Dumbbells", isBodyweight = false,
@@ -357,13 +398,13 @@ object SeedExercises {
         Exercise(
             name = "Dead Bug", muscleGroup = "Core", equipment = "Bodyweight", isBodyweight = true,
             instructions = """
-                Lie on your back with arms pointing at the ceiling and knees bent at 90 degrees above your hips.
+                Lie on your back, arms pointing at the ceiling, knees bent at 90° above your hips.
                 Press your lower back into the floor.
-                Slowly lower your right arm and left leg towards the floor.
-                Return, then switch sides. Count one rep per side.
+                Slowly stretch out the opposite arm and leg until just above the floor, then return.
+                Alternate sides. Count one rep per side.
             """.trimIndent(),
             tips = """
-                Your lower back must stay flat on the floor.
+                If your lower back lifts off the floor, don't stretch out as far.
                 Move slowly; this is about control.
             """.trimIndent(),
             harderName = "Lying Leg Raise", startReps = 8,
@@ -383,6 +424,20 @@ object SeedExercises {
             easierName = "Dead Bug", startReps = 8,
         ),
 
+        Exercise(
+            name = "Plank", muscleGroup = "Core", equipment = "Bodyweight", isBodyweight = true,
+            instructions = """
+                Forearms on the floor, elbows under shoulders.
+                Body in a straight line from head to heels.
+                Squeeze glutes and stomach and hold.
+                Log the seconds you held.
+            """.trimIndent(),
+            tips = """
+                Stop when your hips start to sag.
+                Aim for 20–45 seconds per set.
+            """.trimIndent(),
+            easierName = "Dead Bug", startReps = 20,
+        ),
         // Cardio: minutes are stored as reps, the coach adds or cuts time.
         Exercise(
             name = "Treadmill Run", muscleGroup = "Cardio", equipment = "Treadmill", isBodyweight = true, isCardio = true,
@@ -401,20 +456,21 @@ object SeedExercises {
             startReps = 20, startSets = 1,
         ),
         Exercise(
-            name = "Rowing Machine", muscleGroup = "Cardio", equipment = "Rower", isBodyweight = true, isCardio = true,
+            name = "Rowing Machine", muscleGroup = "Cardio", equipment = "Rower", isBodyweight = true,
             instructions = """
-                Strap your feet in so the strap crosses the widest part of your foot.
-                Drive: push with your legs first, then lean back slightly, then pull the handle to your lower ribs.
-                Recovery: arms forward first, then lean forward, then bend your knees to slide back.
-                Keep a steady rhythm, about 20 to 26 strokes per minute.
+                Setup: feet strapped in with the strap over the widest part of your foot. Damper (the lever on the fan) at 3–5.
+                Catch: knees bent, shins near vertical, arms straight, leaning slightly forward.
+                Drive: push hard with your legs first. When the legs are almost straight, lean back slightly, then pull the handle to your lower ribs.
+                Recovery: arms straight first, lean forward, then bend the knees and slide back to the catch.
                 Log the total minutes and the distance on the monitor.
             """.trimIndent(),
             tips = """
-                It's about 60% legs, 20% body, 20% arms.
-                Damper around 3 to 5 is plenty; higher is not better.
-                Keep your back straight, never hunched.
+                Power is about 60% legs, 20% back, 20% arms. Legs, body, arms on the way back; arms, body, legs on the way forward.
+                Stroke rate (SPM): 20–24 easy, 26–30 for hard intervals. Recovery takes about twice as long as the drive.
+                Mistakes: pulling with the arms before the legs are done; bending the knees before the handle has passed them.
+                A higher damper does not mean a better workout.
             """.trimIndent(),
-            startReps = 15, startSets = 1,
+            isCardio = true, startReps = 28, startSets = 1,
         ),
         Exercise(
             name = "Zwift Bike", muscleGroup = "Cardio", equipment = "Indoor bike", isBodyweight = true, isCardio = true,
@@ -431,5 +487,23 @@ object SeedExercises {
             """.trimIndent(),
             startReps = 30, startSets = 1,
         ),
+        Exercise(
+            name = "Crosstrainer", muscleGroup = "Cardio", equipment = "Crosstrainer", isBodyweight = true,
+            instructions = """
+                Stand tall, feet flat on the pedals, holding the moving handles.
+                Push and pull the handles while you stride, so arms and legs both work.
+                Keep your weight over your feet, not leaning on the handles.
+                Log the total minutes and the distance on the display.
+            """.trimIndent(),
+            tips = """
+                Use resistance, not only speed: if you are spinning fast with no effort, increase the level.
+                In a heavy swell, hold the fixed handles and lower the speed. Balance first, speed second.
+                Steady pace: you can talk in full sentences but would rather not sing.
+            """.trimIndent(),
+            isCardio = true, startReps = 25, startSets = 1,
+        ),
     )
+
+    /** Holds that log seconds instead of reps. */
+    val TIMED = setOf("Plank")
 }

@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.RowScope
+import com.gymcoach.data.isTimed
 import java.text.DateFormat
 import java.util.Date
 
@@ -44,8 +45,9 @@ fun formatDuration(startMillis: Long, endMillis: Long): String {
 }
 
 /** "3 × 8 @ 60 kg", "3 × 12" for bodyweight, or "30 min" for cardio. */
-fun formatTarget(sets: Int, reps: Int, weightKg: Double, cardio: Boolean = false): String = when {
+fun formatTarget(sets: Int, reps: Int, weightKg: Double, cardio: Boolean = false, timed: Boolean = false): String = when {
     cardio -> "$reps min"
+    timed -> "$sets × $reps s"
     weightKg > 0 -> "$sets × $reps @ ${com.gymcoach.coach.formatKg(weightKg)} kg"
     else -> "$sets × $reps"
 }
@@ -59,7 +61,7 @@ fun formatPace(exerciseName: String, minutes: Int, distanceKm: Double): String? 
     }
     return when {
         exerciseName.contains("Row", ignoreCase = true) -> "${minSec(minutes / (distanceKm * 2))} /500 m"
-        exerciseName.contains("Bike", ignoreCase = true) -> "%.1f km/h".format(distanceKm / (minutes / 60.0))
+        exerciseName.contains("Bike", ignoreCase = true) || exerciseName.contains("Cross", ignoreCase = true) -> "%.1f km/h".format(distanceKm / (minutes / 60.0))
         else -> "${minSec(minutes / distanceKm)} /km"
     }
 }
@@ -75,5 +77,6 @@ fun describeSet(exercise: com.gymcoach.data.Exercise?, set: com.gymcoach.data.Se
         return parts.joinToString(" · ")
     }
     val load = if (set.weightKg > 0) "${com.gymcoach.coach.formatKg(set.weightKg)} kg × " else ""
+    if (exercise?.isTimed == true) return "$load${set.reps} s"
     return "$load${set.reps} reps"
 }

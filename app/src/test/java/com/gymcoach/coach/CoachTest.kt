@@ -83,4 +83,19 @@ class CoachTest {
         assertEquals(CoachAction.HOLD, d.action)
         assertEquals(10, d.prescription.reps)
     }
+
+    @Test
+    fun dumbbellsProgressInTwoKiloSteps() {
+        val db = ExerciseInfo("Goblet Squat", isBodyweight = false, easierName = null, harderName = null, weightStepKg = 2.0)
+        val d = Coach.evaluate(db, Prescription(14.0, 12, 2), listOf(sets(12, 6, n = 2, weight = 14.0, targetReps = 12)))
+        assertEquals(16.0, d.prescription.weightKg, 0.0)
+    }
+
+    @Test
+    fun plankAddsFiveSeconds() {
+        val plank = ExerciseInfo("Plank", isBodyweight = true, easierName = "Dead Bug", harderName = null, isTimed = true)
+        val d = Coach.evaluate(plank, Prescription(0.0, 20, 2), listOf(sets(20, 6, n = 2, weight = 0.0, targetReps = 20)))
+        assertEquals(25, d.prescription.reps)
+        assertEquals(15, Coach.tooHard(plank, Prescription(0.0, 20, 2)).prescription.reps)
+    }
 }

@@ -19,11 +19,16 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -38,54 +43,52 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymcoach.coach.ProgramFocus
 import com.gymcoach.coach.ProgramPlanner
 import com.gymcoach.data.Program
+import com.gymcoach.data.ProgramStatus
+import com.gymcoach.data.focusEnum
 import com.gymcoach.ui.GymTopBar
 import com.gymcoach.ui.LocalRepository
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
+
+private val dayMonth: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM")
+
+/** The onboard plan's first day from the PDF, or today once that date has passed. */
+private fun defaultStartDate(): LocalDate {
+    val planned = LocalDate.of(2026, 11, 11)
+    return if (planned.isBefore(LocalDate.now())) LocalDate.now() else planned
+}
 
 /** Shows the active 6-week program, or the setup form when there is none. */
 @Composable
-fun ProgramScreen(back: () -> Unit) {
+fun ProgramScreen(back: () -> Unit, openGuide: () -> Unit) {
     val repo = LocalRepository.current
     val program by repo.activeProgram.collectAsStateWithLifecycle(initialValue = null)
     val p = program
     Column(Modifier.fillMaxSize()) {
-        GymTopBar("6-week program", back = back)
+        GymTopBar("6-week program", back = back, actions = { TextButton(onClick = openGuide) { Text("Guide") } })
         if (p == null) ProgramSetup() else ProgramOverview(p)
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProgramSetup() {
     val repo = LocalRepository.current
     val scope = rememberCoroutineScope()
     var days by remember { mutableIntStateOf(3) }
-    var focus by remember { mutableStateOf(ProgramFocus.MUSCLE) }
+    var focus by remember { mutableStateOf(ProgramFocus.ONBOARD) }
+    var startDate by remember { mutableStateOf(defaultStartDate()) }
+    var pickDate by remember { mutableStateOf(false) }
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item {
-            Text(
-                "The coach builds a 6-week plan from your gym's equipment. Weeks 1 to 5 get gradually harder, " +
-                    "week 6 is an easy recovery week. Weights follow your coach targets, so they keep adjusting as you go.",
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
-        item {
-            Text("Workouts per week", style = MaterialTheme.typography.titleMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ProgramPlanner.DAY_OPTIONS.forEach { n ->
-                    FilterChip(selected = days == n, onClick = { days = n }, label = { Text("$n days") })
-                }
-            }
-            Text(
-                ProgramPlanner.templates(days).joinToString(" · ") { it.first },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.secondary,
-            )
-        }
-        item { Text("Focus", style = MaterialTheme.typography.titleMedium) }
+        item { Text("Choose a plan", style = MaterialTheme.typography.titleMedium) }
         items(ProgramFocus.entries.toList()) { f ->
             Card(
                 onClick = { focus = f },
@@ -101,12 +104,54 @@ private fun ProgramSetup() {
                 }
             }
         }
+        if (focus == ProgramFocus.ONBOARD) {
+            item {
+                Text("First day", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Day 1 of the 7-day cycle. The plan runs 6 weeks from here.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                OutlinedButton(onClick = { pickDate = true }) { Text(startDate.format(dayMonth)) }
+            }
+        } else {
+            item {
+                Text("Workouts per week", style = MaterialTheme.typography.titleMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ProgramPlanner.DAY_OPTIONS.forEach { n ->
+                        FilterChip(selected = days == n, onClick = { days = n }, label = { Text("$n days") })
+                    }
+                }
+                Text(
+                    ProgramPlanner.templates(days).joinToString(" · ") { it.first },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            }
+        }
         item {
             Button(
-                onClick = { scope.launch { repo.startProgram(days, focus) } },
+                onClick = { scope.launch { repo.startProgram(days, focus, startDate) } },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Create my program") }
         }
+    }
+
+    if (pickDate) {
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = startDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { pickDate = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let {
+                        startDate = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()
+                    }
+                    pickDate = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { pickDate = false }) { Text("Cancel") } },
+        ) { DatePicker(state = state) }
     }
 }
 
@@ -116,9 +161,18 @@ private fun ProgramOverview(program: Program) {
     val scope = rememberCoroutineScope()
     val finished by remember(program.id) { repo.finishedProgramSessions(program.id) }
         .collectAsStateWithLifecycle(initialValue = emptyList())
-    val focus = ProgramFocus.entries.firstOrNull { it.name == program.focus } ?: ProgramFocus.MUSCLE
+    val focus = program.focusEnum()
+    val calendar = ProgramPlanner.isCalendarBased(focus)
     val done = finished.mapNotNull { s -> s.programWeek?.let { w -> s.programDay?.let { d -> w to d } } }.toSet()
-    val next = repo.nextProgramDay(program, finished)
+    val status = repo.programStatus(program, finished)
+    val currentWeek = when (status) {
+        is ProgramStatus.Next -> status.plan.week
+        is ProgramStatus.DoneToday -> status.plan.week
+        is ProgramStatus.Rest -> status.week
+        else -> null
+    }
+    val plan = ProgramPlanner.plan(program.daysPerWeek, focus).groupBy { it.week }
+    val start = Instant.ofEpochMilli(program.startedAt).atZone(ZoneId.systemDefault()).toLocalDate()
     var confirmEnd by remember { mutableStateOf(false) }
 
     LazyColumn(
@@ -126,14 +180,36 @@ private fun ProgramOverview(program: Program) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text(
-                "${focus.label} · ${program.daysPerWeek} workouts a week · ${done.size} of ${ProgramPlanner.WEEKS * program.daysPerWeek} done",
-                style = MaterialTheme.typography.titleMedium,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "${focus.label} · ${program.daysPerWeek} sessions a week · ${done.size} of ${ProgramPlanner.WEEKS * program.daysPerWeek} done",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                if (calendar) {
+                    Text(
+                        "Started ${start.format(dayMonth)}, ends ${start.plusDays(ProgramPlanner.WEEKS * 7L - 1).format(dayMonth)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        when (status) {
+                            is ProgramStatus.NotStarted -> "Starts ${status.startDate.format(dayMonth)}."
+                            is ProgramStatus.Next -> "Today: day ${status.plan.day}, ${status.plan.name}."
+                            is ProgramStatus.DoneToday -> "Today's ${status.plan.name} is done. Nice work."
+                            is ProgramStatus.Rest -> "Today: day ${status.day}. ${status.note}"
+                            ProgramStatus.Finished -> "The 6 weeks are done."
+                        },
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                    OutlinedButton(onClick = { scope.launch { repo.shiftProgram(program) } }) {
+                        Text("Shift one day (watch switch)")
+                    }
+                }
+            }
         }
         items((1..ProgramPlanner.WEEKS).toList()) { week ->
             val scheme = ProgramPlanner.scheme(focus, week)
-            val current = next?.week == week
+            val current = currentWeek == week
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = if (current) MaterialTheme.colorScheme.primaryContainer
@@ -142,12 +218,17 @@ private fun ProgramOverview(program: Program) {
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    val title = if (week == ProgramPlanner.DELOAD_WEEK) "Week $week · Recovery" else "Week $week"
+                    val title = when {
+                        ProgramPlanner.isDeload(focus, week) -> "Week $week · Recovery"
+                        scheme.phase.isNotEmpty() -> "Week $week · ${scheme.phase}"
+                        else -> "Week $week"
+                    }
                     Text(title, style = MaterialTheme.typography.titleMedium)
-                    Text("${scheme.sets} × ${scheme.reps} on weights. ${scheme.note}", style = MaterialTheme.typography.bodyMedium)
+                    val setsText = if (calendar) "${scheme.sets} sets per exercise." else "${scheme.sets} × ${scheme.reps} on weights."
+                    Text("$setsText ${scheme.note}", style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.size(8.dp))
-                    ProgramPlanner.templates(program.daysPerWeek).forEachIndexed { i, (name, exercises) ->
-                        val isDone = (week to i + 1) in done
+                    plan[week].orEmpty().forEach { day ->
+                        val isDone = (week to day.day) in done
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 if (isDone) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
@@ -157,9 +238,18 @@ private fun ProgramOverview(program: Program) {
                             )
                             Spacer(Modifier.width(8.dp))
                             Column {
-                                Text(name, style = MaterialTheme.typography.bodyLarge)
+                                val label = if (calendar) {
+                                    val date = start.plusDays((week - 1) * 7L + day.day - 1)
+                                    "Day ${day.day} · ${date.format(dayMonth)} · ${day.name}"
+                                } else {
+                                    day.name
+                                }
+                                Text(label, style = MaterialTheme.typography.bodyLarge)
                                 if (current) {
-                                    Text(exercises.joinToString(", "), style = MaterialTheme.typography.bodySmall)
+                                    Text(
+                                        day.exercises.joinToString(", ") + if (day.duration.isNotEmpty()) " · ${day.duration}" else "",
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
                                 }
                             }
                         }

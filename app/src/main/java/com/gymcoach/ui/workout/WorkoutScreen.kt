@@ -46,7 +46,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymcoach.coach.ProgramFocus
 import com.gymcoach.coach.ProgramPlanner
 import com.gymcoach.coach.effortLabel
+import com.gymcoach.data.focusEnum
+import com.gymcoach.data.isTimed
 import com.gymcoach.data.withPlan
+import com.gymcoach.ui.guide.Guide
 import com.gymcoach.coach.formatKg
 import com.gymcoach.data.Exercise
 import com.gymcoach.data.ExerciseTarget
@@ -78,10 +81,11 @@ fun WorkoutScreen(
     val week = session?.programWeek
     val dayPlan = session?.let { s ->
         program?.takeIf { it.id == s.programId }?.let { p ->
-            ProgramPlanner.plan(p.daysPerWeek).firstOrNull { it.week == s.programWeek && it.day == s.programDay }
+            ProgramPlanner.plan(p.daysPerWeek, p.focusEnum()).firstOrNull { it.week == s.programWeek && it.day == s.programDay }
         }
     }
-    val focus = program?.let { p -> ProgramFocus.entries.firstOrNull { it.name == p.focus } }
+    val focus = program?.focusEnum()
+    val onboard = focus == ProgramFocus.ONBOARD && dayPlan != null
 
     var coachMessages by remember { mutableStateOf<List<String>?>(null) }
     var closeAfterMessages by remember { mutableStateOf(false) }
@@ -105,13 +109,26 @@ fun WorkoutScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (week != null && focus != null) {
+            if (week != null && focus != null && dayPlan != null) {
                 item {
-                    Text(
-                        ProgramPlanner.scheme(focus, week).note,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        val isStrength = dayPlan.exercises.size > 1
+                        if (isStrength || !onboard) {
+                            Text(
+                                ProgramPlanner.scheme(focus, week).note,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.secondary,
+                            )
+                        }
+                        dayPlan.note?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                        if (onboard && isStrength) {
+                            Text(
+                                "Warm-up first (8 min): ${Guide.WARM_UP.joinToString(" ")} " +
+                                    "Rest 90 s between sets of big lifts, 60 s for the rest.",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
                 }
             }
             if (exercises.isEmpty()) {
@@ -126,6 +143,7 @@ fun WorkoutScreen(
             items(exercises, key = { it.id }) { exercise ->
                 ExerciseCard(
                     exercise = exercise,
+                    repRange = if (onboard) ProgramPlanner.onboardRepRange[exercise.name] else null,
                     target = (targetMap[exercise.id] ?: repo.defaultTarget(exercise)).let { base ->
                         planMap[exercise.id]?.let { base.withPlan(it) } ?: base
                     },
@@ -196,6 +214,7 @@ fun WorkoutScreen(
 @Composable
 private fun ExerciseCard(
     exercise: Exercise,
+    repRange: String?,
     target: ExerciseTarget,
     sets: List<SetEntry>,
     onLog: (weightKg: Double, reps: Int, effort: Int, distanceKm: Double) -> Unit,
@@ -219,7 +238,8 @@ private fun ExerciseCard(
                 Column(Modifier.weight(1f)) {
                     Text(exercise.name, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Coach target: ${formatTarget(target.sets, target.reps, target.weightKg, cardio)}",
+                        "Coach target: ${formatTarget(target.sets, target.reps, target.weightKg, cardio, exercise.isTimed)}" +
+                            (repRange?.let { " (range $it)" } ?: ""),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -278,7 +298,7 @@ private fun ExerciseCard(
                 OutlinedTextField(
                     value = repsText,
                     onValueChange = { repsText = it.filter(Char::isDigit) },
-                    label = { Text(if (cardio) "Minutes" else "Reps") },
+                    label = { Text(if (cardio) "Minutes" else if (exercise.isTimed) "Seconds" else "Reps") },
                     singleLine = true,
                     isError = reps == null,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

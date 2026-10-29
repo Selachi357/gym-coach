@@ -25,6 +25,10 @@ data class ExerciseInfo(
     val harderName: String?,
     /** Cardio uses [Prescription.reps] and [LoggedSet.reps] as minutes. */
     val isCardio: Boolean = false,
+    /** Timed holds (plank) use reps as seconds. */
+    val isTimed: Boolean = false,
+    /** Smallest weight jump: 2 kg per dumbbell, 2.5 kg on a barbell or machine. */
+    val weightStepKg: Double = Coach.WEIGHT_STEP_KG,
 )
 
 enum class CoachAction { PROGRESS, HOLD, DELOAD, REDUCE_REPS, SWITCH_EASIER, SWITCH_HARDER }
@@ -48,6 +52,8 @@ data class CoachDecision(
  *   +1 rep for bodyweight moves, and a harder variant once bodyweight reps reach [MAX_BODYWEIGHT_REPS].
  * - Anything else: keep the same target and build consistency.
  *
+ * Timed holds work in seconds: +5 s when easy (up to [MAX_TIMED_SEC]), -5 s when too hard.
+ *
  * Cardio (run, row, bike) works in minutes: an easy session (effort 7 or less) adds 5 minutes up to
  * [MAX_CARDIO_MIN], and struggling cuts the time by ~20%.
  */
@@ -61,6 +67,10 @@ object Coach {
     const val CARDIO_STEP_MIN = 5
     const val MIN_CARDIO_MIN = 10
     const val MAX_CARDIO_MIN = 60
+    const val DUMBBELL_STEP_KG = 2.0
+    const val TIMED_STEP_SEC = 5
+    const val MIN_TIMED_SEC = 15
+    const val MAX_TIMED_SEC = 60
 
     fun isStruggle(sets: List<LoggedSet>): Boolean {
         if (sets.isEmpty()) return false
@@ -121,9 +131,18 @@ object Coach {
                 CoachDecision(CoachAction.HOLD, current, message = "${exercise.name}: $reason. Keep $minutes minutes but lower the speed or resistance. $tip")
             }
         }
-        if (!exercise.isBodyweight && current.weightKg > WEIGHT_STEP_KG) {
-            val newWeight = max(WEIGHT_STEP_KG, roundToStep(current.weightKg * 0.9))
-            val dropped = if (newWeight < current.weightKg) newWeight else current.weightKg - WEIGHT_STEP_KG
+        if (exercise.isTimed) {
+            val secs = max(MIN_TIMED_SEC, current.reps - TIMED_STEP_SEC)
+            return CoachDecision(
+                CoachAction.REDUCE_REPS,
+                current.copy(reps = secs),
+                message = "${exercise.name}: $reason, so hold for $secs seconds. Stop when your hips start to sag.",
+            )
+        }
+        val step = exercise.weightStepKg
+        if (!exercise.isBodyweight && current.weightKg > step) {
+            val newWeight = max(step, roundToStep(current.weightKg * 0.9, step))
+            val dropped = if (newWeight < current.weightKg) newWeight else current.weightKg - step
             return CoachDecision(
                 CoachAction.DELOAD,
                 current.copy(weightKg = dropped),
@@ -173,6 +192,15 @@ object Coach {
                 message = "${exercise.name}: that felt comfortable. Go for $minutes minutes next time.",
             )
         }
+        if (exercise.isTimed) {
+            val secs = minOf(MAX_TIMED_SEC, current.reps + TIMED_STEP_SEC)
+            return CoachDecision(
+                if (secs > current.reps) CoachAction.PROGRESS else CoachAction.HOLD,
+                current.copy(reps = secs),
+                message = if (secs > current.reps) "${exercise.name}: solid hold, go for $secs seconds next time."
+                else "${exercise.name}: $MAX_TIMED_SEC seconds is plenty. Keep it strict.",
+            )
+        }
         if (exercise.isBodyweight) {
             if (current.reps >= MAX_BODYWEIGHT_REPS && exercise.harderName != null) {
                 return CoachDecision(
@@ -189,15 +217,15 @@ object Coach {
                 message = "${exercise.name}: great job, aim for $reps reps next time.",
             )
         }
-        val newWeight = current.weightKg + WEIGHT_STEP_KG
+        val newWeight = current.weightKg + exercise.weightStepKg
         return CoachDecision(
             CoachAction.PROGRESS,
             current.copy(weightKg = newWeight),
-            message = "${exercise.name}: all sets done with reps to spare. Adding ${formatKg(WEIGHT_STEP_KG)} kg next time.",
+            message = "${exercise.name}: all sets done with reps to spare. Adding ${formatKg(exercise.weightStepKg)} kg next time.",
         )
     }
 
-    fun roundToStep(kg: Double): Double = (kg / WEIGHT_STEP_KG).roundToInt() * WEIGHT_STEP_KG
+    fun roundToStep(kg: Double, step: Double = WEIGHT_STEP_KG): Double = (kg / step).roundToInt() * step
 
     private fun roundToStep(value: Double, step: Int): Int = (value / step).roundToInt() * step
 }

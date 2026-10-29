@@ -3,6 +3,7 @@ package com.gymcoach
 import android.app.Application
 import com.gymcoach.data.GymDatabase
 import com.gymcoach.data.GymRepository
+import com.gymcoach.notify.Reminders
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -17,5 +18,7 @@ class GymCoachApp : Application() {
         super.onCreate()
         repository = GymRepository(GymDatabase.create(this))
         appScope.launch { repository.seedIfEmpty() }
+        Reminders.ensureChannel(this)
+        Reminders.schedule(this)
     }
 }

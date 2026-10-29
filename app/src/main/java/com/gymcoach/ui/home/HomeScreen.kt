@@ -13,11 +13,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SportsGymnastics
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,7 +38,13 @@ import com.gymcoach.ui.formatDateTime
 import kotlinx.coroutines.launch
 
 @Composable
-fun HomeScreen(openWorkout: (Long) -> Unit, openGoals: () -> Unit, openProgram: () -> Unit) {
+fun HomeScreen(
+    openWorkout: (Long) -> Unit,
+    openGoals: () -> Unit,
+    openProgram: () -> Unit,
+    openHero: () -> Unit,
+    openSettings: () -> Unit,
+) {
     val repo = LocalRepository.current
     val scope = rememberCoroutineScope()
     val active by repo.activeSession.collectAsStateWithLifecycle(initialValue = null)
@@ -48,12 +56,15 @@ fun HomeScreen(openWorkout: (Long) -> Unit, openGoals: () -> Unit, openProgram: 
     val program by repo.activeProgram.collectAsStateWithLifecycle(initialValue = null)
 
     Column(Modifier.fillMaxSize()) {
-        GymTopBar("Gym Coach")
+        GymTopBar("Gym Coach", actions = {
+            IconButton(onClick = openSettings) { Icon(Icons.Filled.Settings, contentDescription = "Settings") }
+        })
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            item { com.gymcoach.ui.hero.HeroBanner(onClick = openHero) }
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                     Column(Modifier.fillMaxWidth().padding(20.dp)) {
@@ -159,17 +170,25 @@ private fun ProgramHomeCard(
     val repo = LocalRepository.current
     val finished by androidx.compose.runtime.remember(program.id) { repo.finishedProgramSessions(program.id) }
         .collectAsStateWithLifecycle(initialValue = emptyList())
-    val next = repo.nextProgramDay(program, finished)
+    val status = repo.programStatus(program, finished)
+    val next = (status as? com.gymcoach.data.ProgramStatus.Next)?.plan
     val total = com.gymcoach.coach.ProgramPlanner.WEEKS * program.daysPerWeek
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Text(
-                if (next != null) "Week ${next.week} of 6 · ${next.name}" else "Program complete!",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            if (next != null) {
-                Text(next.exercises.joinToString(", "), style = MaterialTheme.typography.bodySmall)
+            val (title, detail) = when (status) {
+                is com.gymcoach.data.ProgramStatus.Next ->
+                    "Week ${status.plan.week} of 6 · ${status.plan.name}" to
+                        (status.plan.exercises.joinToString(", ") + if (status.plan.duration.isNotEmpty()) " · ${status.plan.duration}" else "")
+                is com.gymcoach.data.ProgramStatus.DoneToday ->
+                    "Week ${status.plan.week} of 6 · done for today" to "${status.plan.name} is logged. Recover well."
+                is com.gymcoach.data.ProgramStatus.Rest -> "Week ${status.week} of 6 · rest day" to status.note
+                is com.gymcoach.data.ProgramStatus.NotStarted ->
+                    "Plan starts ${status.startDate.format(java.time.format.DateTimeFormatter.ofPattern("EEE d MMM"))}" to
+                        "Get familiar with the exercises and the guide until then."
+                com.gymcoach.data.ProgramStatus.Finished -> "Program complete!" to "Start a new one to keep progressing."
             }
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(detail, style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.size(8.dp))
             LinearProgressIndicator(
                 progress = { (finished.size.toFloat() / total).coerceIn(0f, 1f) },

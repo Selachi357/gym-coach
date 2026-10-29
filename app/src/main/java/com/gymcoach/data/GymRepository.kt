@@ -10,11 +10,19 @@ import com.gymcoach.coach.ProgramDayPlan
 import com.gymcoach.coach.ProgramFocus
 import com.gymcoach.coach.ProgramPlanner
 import com.gymcoach.coach.formatKg
+import com.gymcoach.game.HeroCalculator
+import com.gymcoach.game.HeroStats
+import com.gymcoach.game.SetRecord
+import com.gymcoach.game.WorkoutRecord
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 
 class GymRepository(private val db: GymDatabase) {
     private val dao = db.dao()
@@ -34,12 +42,48 @@ class GymRepository(private val db: GymDatabase) {
     fun sessionsThisWeek(): Flow<Int> = dao.finishedSessionsSince(startOfWeek())
     fun sessionPlans(sessionId: Long): Flow<List<SessionExercise>> = dao.sessionPlans(sessionId)
     val activeProgram: Flow<Program?> = dao.activeProgram()
+
+    /** XP, level, rank, streak and quests, recomputed whenever the log changes. */
+    val hero: Flow<HeroStats> = combine(dao.finishedSessions(), dao.finishedSets(), dao.exercises(), dao.goals()) { sessions, sets, exercises, goals ->
+        buildHero(sessions, sets, exercises, goals)
+    }
+
+    suspend fun heroNow(): HeroStats =
+        buildHero(dao.getFinishedSessions(), dao.getFinishedSets(), dao.allExercises(), dao.allGoals())
+
+    private fun buildHero(
+        sessions: List<WorkoutSession>,
+        sets: List<SetEntry>,
+        exercises: List<Exercise>,
+        goals: List<Goal>,
+    ): HeroStats {
+        val cardio = exercises.filter { it.isCardio }.map { it.id }.toSet()
+        val setsBySession = sets.groupBy { it.sessionId }
+        val zone = ZoneId.systemDefault()
+        val records = sessions.map { s ->
+            WorkoutRecord(
+                date = Instant.ofEpochMilli(s.startedAt).atZone(zone).toLocalDate(),
+                inProgram = s.programId != null,
+                sets = setsBySession[s.id].orEmpty().map {
+                    SetRecord(it.exerciseId, it.weightKg, it.reps, it.exerciseId in cardio, it.distanceKm)
+                },
+            )
+        }
+        val weeklyTarget = goals.firstOrNull { it.type == GoalType.WEEKLY_SESSIONS && it.achievedAt == null }
+            ?.target?.toInt()?.coerceAtLeast(1) ?: 3
+        return HeroCalculator.compute(records, LocalDate.now(), weeklyTarget)
+    }
     fun finishedProgramSessions(programId: Long): Flow<List<WorkoutSession>> = dao.finishedProgramSessions(programId)
 
     suspend fun seedIfEmpty() {
         val firstRun = dao.exerciseCount() == 0
-        // Always insert: existing names are ignored, so app updates add new library exercises.
-        dao.insertExercises(SeedExercises.all)
+        // App updates add new library exercises and refresh the how-to text of existing ones.
+        for (seed in SeedExercises.all) {
+            val existing = dao.getExerciseByName(seed.name)
+            if (existing == null) dao.insertExercises(listOf(seed)) else if (existing != seed.copy(id = existing.id)) {
+                dao.updateExercise(seed.copy(id = existing.id))
+            }
+        }
         if (firstRun) {
             dao.insertCoachNote(
                 CoachNote(
@@ -131,10 +175,13 @@ class GymRepository(private val db: GymDatabase) {
             dao.deleteSession(sessionId)
             return listOf("No sets were logged, so I didn't save this workout.")
         }
+        val heroBefore = heroNow()
         dao.updateSession(session.copy(endedAt = System.currentTimeMillis()))
 
         val messages = mutableListOf<String>()
-        if (session.programWeek == ProgramPlanner.DELOAD_WEEK) {
+        val sessionProgram = session.programId?.let { dao.getProgram(it) }
+        val week = session.programWeek
+        if (sessionProgram != null && week != null && ProgramPlanner.isDeload(sessionProgram.focusEnum(), week)) {
             messages += "Deload week: your targets stay the same so your body can recover."
         } else {
             for (exerciseId in sets.map { it.exerciseId }.distinct()) {
@@ -161,35 +208,66 @@ class GymRepository(private val db: GymDatabase) {
         }
         messages += programProgress(session)
         messages += checkGoals()
-        return messages
+        val celebration = HeroCalculator.celebrate(heroBefore, heroNow())
+        celebration.filter { !it.startsWith("+") }.forEach {
+            dao.insertCoachNote(CoachNote(message = it, createdAt = System.currentTimeMillis()))
+        }
+        return celebration + messages
     }
 
     // Programs
 
-    suspend fun startProgram(daysPerWeek: Int, focus: ProgramFocus) {
+    suspend fun startProgram(daysPerWeek: Int, focus: ProgramFocus, startDate: LocalDate = LocalDate.now()) {
         dao.deactivatePrograms()
-        dao.insertProgram(Program(startedAt = System.currentTimeMillis(), daysPerWeek = daysPerWeek, focus = focus.name, active = true))
-        dao.insertCoachNote(
-            CoachNote(
-                message = "Your 6-week ${focus.label.lowercase()} program is ready: $daysPerWeek workouts a week. " +
-                    "Weeks 1 to 5 build up, week 6 is an easy recovery week.",
-                createdAt = System.currentTimeMillis(),
-            )
-        )
+        val start = if (ProgramPlanner.isCalendarBased(focus)) startDate.toEpochMillis() else System.currentTimeMillis()
+        val days = ProgramPlanner.workoutsPerWeek(focus, daysPerWeek)
+        dao.insertProgram(Program(startedAt = start, daysPerWeek = days, focus = focus.name, active = true))
+        val message = if (focus == ProgramFocus.ONBOARD) {
+            "Your onboard plan starts ${startDate.format(DateTimeFormatter.ofPattern("d MMM"))}: 3 strength and 2 cardio sessions " +
+                "every 7 days. Weeks 1–2 Learn, 3–4 Build, 5–6 Push. Missing a session costs nothing; training exhausted does."
+        } else {
+            "Your 6-week ${focus.label.lowercase()} program is ready: $days workouts a week. " +
+                "Weeks 1 to 5 build up, week 6 is an easy recovery week."
+        }
+        dao.insertCoachNote(CoachNote(message = message, createdAt = System.currentTimeMillis()))
     }
 
     suspend fun endProgram() = dao.deactivatePrograms()
 
-    /** The next program workout to do, or null when the program is finished. */
-    fun nextProgramDay(program: Program, finished: List<WorkoutSession>): ProgramDayPlan? {
+    /** Moves the whole onboard plan one day later, for a watch switch day. */
+    suspend fun shiftProgram(program: Program) {
+        val shifted = Instant.ofEpochMilli(program.startedAt).atZone(ZoneId.systemDefault()).toLocalDate().plusDays(1)
+        dao.updateProgram(program.copy(startedAt = shifted.toEpochMillis()))
+    }
+
+    fun programStatus(program: Program, finished: List<WorkoutSession>, today: LocalDate = LocalDate.now()): ProgramStatus {
+        val focus = program.focusEnum()
         val done = finished.mapNotNull { s -> s.programWeek?.let { w -> s.programDay?.let { d -> w to d } } }.toSet()
-        return ProgramPlanner.plan(program.daysPerWeek).firstOrNull { (it.week to it.day) !in done }
+        if (!ProgramPlanner.isCalendarBased(focus)) {
+            val next = ProgramPlanner.plan(program.daysPerWeek, focus).firstOrNull { (it.week to it.day) !in done }
+            return if (next == null) ProgramStatus.Finished else ProgramStatus.Next(next)
+        }
+        val start = Instant.ofEpochMilli(program.startedAt).atZone(ZoneId.systemDefault()).toLocalDate()
+        val index = ChronoUnit.DAYS.between(start, today)
+        if (index < 0) return ProgramStatus.NotStarted(start)
+        val week = (index / 7).toInt() + 1
+        val day = (index % 7).toInt() + 1
+        if (week > ProgramPlanner.WEEKS) return ProgramStatus.Finished
+        val plan = ProgramPlanner.onboardDay(week, day)
+            ?: return ProgramStatus.Rest(week, day, ProgramPlanner.onboardRestNote(day))
+        return if ((week to day) in done) ProgramStatus.DoneToday(plan) else ProgramStatus.Next(plan)
+    }
+
+    suspend fun currentProgramStatus(): ProgramStatus? {
+        val program = dao.getActiveProgram() ?: return null
+        return programStatus(program, dao.getFinishedProgramSessions(program.id))
     }
 
     /** Starts the next program workout with its exercises and this week's targets. Returns the session id. */
     suspend fun startProgramDay(): Long? {
         val program = dao.getActiveProgram() ?: return null
-        val day = nextProgramDay(program, dao.getFinishedProgramSessions(program.id)) ?: return null
+        val day = (programStatus(program, dao.getFinishedProgramSessions(program.id)) as? ProgramStatus.Next)?.plan
+            ?: return null
         val sessionId = dao.insertSession(
             WorkoutSession(
                 startedAt = System.currentTimeMillis(),
@@ -210,11 +288,13 @@ class GymRepository(private val db: GymDatabase) {
     private suspend fun refreshPlans(sessionId: Long) {
         val session = dao.getSession(sessionId) ?: return
         val week = session.programWeek ?: return
-        val program = dao.getActiveProgram()?.takeIf { it.id == session.programId } ?: return
-        val focus = runCatching { ProgramFocus.valueOf(program.focus) }.getOrDefault(ProgramFocus.MUSCLE)
+        val program = session.programId?.let { dao.getProgram(it) } ?: return
+        val focus = program.focusEnum()
         dao.sessionPlansOnce(sessionId).forEach { se ->
             val ex = dao.getExercise(se.exerciseId) ?: return@forEach
-            val planned = ProgramPlanner.planned(focus, week, ex.isBodyweight, ex.isCardio, targetFor(ex.id).toPrescription())
+            val planned = ProgramPlanner.planned(
+                focus, week, ex.isBodyweight, ex.isCardio, targetFor(ex.id).toPrescription(), ex.name, ex.weightStepKg,
+            )
             dao.updateSessionExercise(
                 se.copy(plannedSets = planned.sets, plannedReps = planned.reps, plannedWeightKg = planned.weightKg)
             )
@@ -224,13 +304,24 @@ class GymRepository(private val db: GymDatabase) {
     private suspend fun programProgress(session: WorkoutSession): List<String> {
         val programId = session.programId ?: return emptyList()
         val program = dao.getActiveProgram()?.takeIf { it.id == programId } ?: return emptyList()
-        val next = nextProgramDay(program, dao.getFinishedProgramSessions(programId))
-        return when {
-            next == null -> {
+        if (ProgramPlanner.isCalendarBased(program.focusEnum())) {
+            return if (session.programWeek == ProgramPlanner.WEEKS && session.programDay == 6) {
+                listOf("That was the last session of your 6-week plan. Compare your log with week 1 and see how far you've come!")
+            } else {
+                emptyList()
+            }
+        }
+        return when (val status = programStatus(program, dao.getFinishedProgramSessions(programId))) {
+            is ProgramStatus.Finished -> {
                 dao.deactivatePrograms()
                 listOf("You finished your 6-week program! Start a new one to keep progressing; it will use your new weights.")
             }
-            next.week != session.programWeek -> listOf("Week ${session.programWeek} done. Next up: week ${next.week}.")
+            is ProgramStatus.Next ->
+                if (status.plan.week != session.programWeek) {
+                    listOf("Week ${session.programWeek} done. Next up: week ${status.plan.week}.")
+                } else {
+                    emptyList()
+                }
             else -> emptyList()
         }
     }
@@ -305,7 +396,31 @@ class GymRepository(private val db: GymDatabase) {
     }
 }
 
-fun Exercise.toInfo() = ExerciseInfo(name, isBodyweight, easierName, harderName, isCardio)
+fun Exercise.toInfo() = ExerciseInfo(name, isBodyweight, easierName, harderName, isCardio, isTimed, weightStepKg)
+
+/** Plank and other holds log seconds instead of reps. */
+val Exercise.isTimed: Boolean get() = name in SeedExercises.TIMED
+
+/** 2 kg per dumbbell, 2.5 kg for barbells and machines. */
+val Exercise.weightStepKg: Double
+    get() = if (equipment.contains("Dumbbell", ignoreCase = true)) Coach.DUMBBELL_STEP_KG else Coach.WEIGHT_STEP_KG
+
+fun Program.focusEnum(): ProgramFocus =
+    ProgramFocus.entries.firstOrNull { it.name == focus } ?: ProgramFocus.MUSCLE
+
+private fun LocalDate.toEpochMillis(): Long = atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+sealed interface ProgramStatus {
+    /** Onboard plan before its start date. */
+    data class NotStarted(val startDate: LocalDate) : ProgramStatus
+    /** The workout to do now. */
+    data class Next(val plan: ProgramDayPlan) : ProgramStatus
+    /** Onboard plan: today's session is already logged. */
+    data class DoneToday(val plan: ProgramDayPlan) : ProgramStatus
+    /** Onboard plan rest day. */
+    data class Rest(val week: Int, val day: Int, val note: String) : ProgramStatus
+    data object Finished : ProgramStatus
+}
 
 fun ExerciseTarget.toPrescription() = Prescription(weightKg, reps, sets)
 

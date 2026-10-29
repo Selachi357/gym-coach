@@ -8,6 +8,9 @@ An offline-first Android workout log with a built-in coach. Everything is stored
 - **Exercise library:** ~30 common gym exercises with step-by-step instructions, form tips, and easier/harder variations.
 - **Goals:** strength goals ("Bench Press 80 kg") and consistency goals ("3 workouts per week") with progress bars.
 - **6-week program:** pick 2, 3 or 4 workouts a week and a focus (strength, muscle or fitness). Weeks 1–5 build up, week 6 is a recovery week. Weights come from the coach's targets, so the plan keeps adapting.
+- **Onboard plan:** the 6-week ship plan (3 strength + 2 cardio sessions per 7-day cycle, Learn/Build/Push phases) with rower intervals, crosstrainer sessions, a "shift one day" button for watch switches, and a guide with watch times, warm-up, safety and recovery.
+- **Reminders:** a daily notification with today's session, timed for your watch (day watch 18:30, night watch 14:00, or custom). Rest days stay quiet.
+- **Hero (level-up system):** earn XP for workouts, sets, records and streaks; rank up from Peasant to Legend of the Realm with a pixel-art hero that gains gear; complete quests for badges. Everything is computed from your log.
 - **History:** every finished workout with sets, total volume and duration.
 - **Coach:** after each workout the coach reviews every exercise and sets your next target:
   - All sets done at effort 8 or lower → +2.5 kg (or +1 rep for bodyweight moves; harder variant at 15 reps).
@@ -26,3 +29,7 @@ Kotlin, Jetpack Compose, Material 3, Room. Coach rules live in `app/src/main/jav
 ```
 ./gradlew testDebugUnitTest assembleRelease
 ```
+
+## Credits
+
+Pixel font: [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) by CodeMan38, SIL Open Font License 1.1 (see `licenses/PressStart2P-OFL.txt`).
