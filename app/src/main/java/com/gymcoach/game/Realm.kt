@@ -65,49 +65,17 @@ data class Voyage(
     val at: Island get() = reached.last()
 }
 
-/** Castle buildings, built in order as soon as your total gold and stone can pay for them. */
-enum class Building(val title: String, val gold: Int, val stone: Int, val description: String) {
-    CAMPFIRE("Campfire", 0, 0, "Where every kingdom starts."),
-    PALISADE("Wooden Palisade", 20, 15, "A fence of sharp stakes."),
-    STONE_WALL("Stone Wall", 40, 40, "Solid walls around the yard."),
-    KEEP("The Keep", 60, 60, "A stone tower to call home."),
-    WATCHTOWER("Watchtower", 80, 70, "See storms and enemies coming."),
-    FORGE("Forge", 90, 90, "Where your blade gets sharper."),
-    BARRACKS("Barracks", 110, 100, "Room for a crew of loyal soldiers."),
-    CHAPEL("Chapel", 130, 120, "Quiet rest between battles."),
-    GREAT_HALL("Great Hall", 150, 140, "Feasts for every victory."),
-    GATEHOUSE("Gatehouse", 180, 170, "A drawbridge and a portcullis."),
-    ROYAL_TOWER("Royal Tower", 220, 200, "The tallest tower in the realm."),
-}
-
-data class Castle(
-    val goldEarned: Int,
-    val stoneEarned: Int,
-    val built: List<Building>,
-    val next: Building?,
-    /** Gold and stone left after paying for everything built. */
-    val gold: Int,
-    val stone: Int,
-    /** One banner for every week you hit your weekly target. */
-    val banners: Int,
-)
-
-data class Realm(val campaign: Campaign, val voyage: Voyage, val castle: Castle)
+data class Realm(val campaign: Campaign, val voyage: Voyage)
 
 /**
  * The three games, all derived from the workout log like the hero levels:
  * - Campaign: each week of the six-week campaign has a boss. Workouts deal damage; beat it before the week ends.
  * - Voyage: cardio moves your ship (km, or 1 km per 6 minutes when no distance is logged); strength workouts open chests.
- * - Castle: workouts earn gold, sets earn stone, and buildings go up as soon as you can pay for them.
  */
 object RealmCalculator {
     const val DAMAGE_WORKOUT = 30
     const val DAMAGE_SET = 5
     const val MAX_CARDIO_DAMAGE = 60
-    const val GOLD_WORKOUT = 10
-    const val GOLD_PROGRAM = 5
-    const val STONE_SET = 2
-    const val CARDIO_MIN_PER_STONE = 5
     const val MIN_PER_KM = 6.0
 
     fun damage(w: WorkoutRecord): Int {
@@ -125,20 +93,15 @@ object RealmCalculator {
 
     private fun weekStart(date: LocalDate) = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 
-    /**
-     * [campaignStart] is the first day of your plan, or null to start on the Monday of your first workout.
-     * [keptWeeks] is the number of weeks you hit your weekly target (from [HeroStats]).
-     */
+    /** [campaignStart] is the first day of your plan, or null to start on the Monday of your first workout. */
     fun compute(
         workouts: List<WorkoutRecord>,
         today: LocalDate,
         campaignStart: LocalDate? = null,
         sessionsPerWeek: Int = 5,
-        keptWeeks: Int = 0,
     ): Realm = Realm(
         campaign(workouts, today, campaignStart, sessionsPerWeek),
         voyage(workouts),
-        castle(workouts, keptWeeks),
     )
 
     fun campaign(workouts: List<WorkoutRecord>, today: LocalDate, campaignStart: LocalDate?, sessionsPerWeek: Int): Campaign {
@@ -199,23 +162,6 @@ object RealmCalculator {
         )
     }
 
-    fun castle(workouts: List<WorkoutRecord>, keptWeeks: Int): Castle {
-        val gold = workouts.sumOf { GOLD_WORKOUT + if (it.inProgram) GOLD_PROGRAM else 0 }
-        val stone = workouts.sumOf { w ->
-            STONE_SET * w.sets.count { !it.cardio } + w.sets.filter { it.cardio }.sumOf { it.reps } / CARDIO_MIN_PER_STONE
-        }
-        var g = gold
-        var s = stone
-        val built = mutableListOf<Building>()
-        for (b in Building.entries) {
-            if (g < b.gold || s < b.stone) break
-            g -= b.gold
-            s -= b.stone
-            built += b
-        }
-        return Castle(gold, stone, built, Building.entries.getOrNull(built.size), g, s, keptWeeks)
-    }
-
     /** Messages for what changed in the realm, e.g. after finishing a workout. */
     fun celebrate(before: Realm, after: Realm): List<String> {
         val messages = mutableListOf<String>()
@@ -233,10 +179,6 @@ object RealmCalculator {
         (after.voyage.chestsOpened - before.voyage.chestsOpened.toSet()).filter { it != Island.HOME_PORT }.forEach {
             messages += "Chest opened on ${it.title}: ${it.treasure}."
         }
-        (after.castle.built - before.castle.built.toSet()).forEach {
-            messages += "Your castle grows: ${it.title} built."
-        }
-        if (after.castle.banners > before.castle.banners) messages += "A new banner flies over your castle."
         return messages
     }
 }

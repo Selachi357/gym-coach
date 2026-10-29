@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymcoach.game.Boss
+import com.gymcoach.game.City
+import com.gymcoach.game.Res
 import com.gymcoach.game.DefenderGame
 import com.gymcoach.game.Enemy
 import com.gymcoach.game.Foe
@@ -154,18 +156,20 @@ fun DefenderScreen(back: () -> Unit) {
     val repo = LocalRepository.current
     val context = LocalContext.current
     val game by repo.game.collectAsStateWithLifecycle(initialValue = null)
+    val city by repo.city.collectAsStateWithLifecycle()
     val g = game
     Column(Modifier.fillMaxSize().background(Retro.deep)) {
         GymTopBar("Castle Defender", back = back)
         if (g == null) return@Column
-        val loadout = remember(g) { Loadout.from(g.hero, g.realm, g.trainedToday) }
+        val defence = City.defence(city)
+        val loadout = remember(g, city) { Loadout.from(g.hero, g.realm, defence, g.trainedToday) }
         // The boss waves bring this week's campaign boss, or the dragon once the campaign is over.
         val boss = g.realm.campaign.current?.boss ?: Boss.DEEP_DRAGON
         var run by remember { mutableIntStateOf(0) }
         val defender = remember(run) { DefenderGame(loadout) }
         var frame by remember { mutableIntStateOf(0) }
         var newBest by remember(run) { mutableStateOf(false) }
-        var saved by remember(run) { mutableStateOf(false) }
+        var plunder by remember(run) { mutableStateOf<Res?>(null) }
 
         LaunchedEffect(defender) {
             var last = withFrameNanos { it }
@@ -175,9 +179,11 @@ fun DefenderScreen(back: () -> Unit) {
                 last = now
                 frame++
             }
-            if (!saved) {
+            if (plunder == null) {
                 newBest = DefenderRecords.save(context, defender.wave, defender.score)
-                saved = true
+                val loot = City.plunder(defender.wave, defender.score, defence.plunderBonus)
+                plunder = loot
+                repo.addPlunder(loot)
             }
         }
 
@@ -254,6 +260,25 @@ fun DefenderScreen(back: () -> Unit) {
                     }
                 }
 
+                if (defender.lightningFlash > 0f) {
+                    drawRect(Color.White.copy(alpha = 0.35f), size = size)
+                    for (e in defender.enemies) {
+                        val cx = e.x * w
+                        val top = laneY(e.lane, h)
+                        // A zig-zag bolt from the sky.
+                        var y0 = 0f
+                        var x0 = cx
+                        var i = 0
+                        while (y0 < top) {
+                            val y1 = minOf(top, y0 + h * 0.08f)
+                            val x1 = cx + if (i % 2 == 0) 14f else -14f
+                            drawLine(Color(0xFFDDEEFF), Offset(x0, y0), Offset(x1, y1), strokeWidth = 6f)
+                            x0 = x1
+                            y0 = y1
+                            i++
+                        }
+                    }
+                }
                 for (s in defender.shots) {
                     val from = Offset(wallW, h * 0.2f)
                     val to = Offset(s.toX * w, laneY(s.lane, h))
@@ -293,12 +318,18 @@ fun DefenderScreen(back: () -> Unit) {
                             PixelText("WAVE ${defender.wave} · ${defender.kills} KILLS", 9.sp)
                             Spacer(Modifier.size(6.dp))
                             PixelText("SCORE ${defender.score}", 11.sp, Retro.gold)
+                            plunder?.let {
+                                Spacer(Modifier.size(8.dp))
+                                PixelText("PLUNDER FOR YOUR VILLAGE", 7.sp, Retro.dim)
+                                Spacer(Modifier.size(4.dp))
+                                ResLine(it, Retro.xp, prefix = "+")
+                            }
                             if (newBest) {
                                 Spacer(Modifier.size(6.dp))
                                 PixelText("NEW BEST!", 9.sp, Retro.xp)
                             }
                             Spacer(Modifier.size(10.dp))
-                            PixelText("Train to grow your castle and hero: a stronger wall, more archers and harder arrows.", 7.sp, Retro.dim)
+                            PixelText("Train to grow your village and hero: a stronger wall, more archers and harder arrows.", 7.sp, Retro.dim)
                             Spacer(Modifier.size(14.dp))
                             Row {
                                 RetroButton(onClick = { run++ }) { Text("Again") }

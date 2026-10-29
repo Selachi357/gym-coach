@@ -13,8 +13,8 @@ An offline-first Android workout log with a built-in coach. Everything is stored
 - **Hero (level-up system):** earn XP for workouts, sets, records and streaks; rank up from Peasant to Legend of the Realm with a pixel-art hero that gains gear; complete quests for badges. Everything is computed from your log.
 - **Boss campaign:** six weeks, six bosses, from the Bilge Rat King to the Dragon of the Deep. Workouts deal damage; beat each boss before Sunday ends to claim its loot.
 - **Voyage map:** cardio km sail your ship across a pixel sea to ten islands; strength workouts open their treasure chests.
-- **Castle builder:** workouts earn gold and sets earn stone; your castle grows from a campfire to a royal tower, with a banner for every week you hit your target.
-- **Castle Defender:** a tap-to-shoot mini-game. Waves of goblins, bats, orcs, trolls and bosses attack your wall. Your castle gives the wall HP and archers, your level and slain bosses make arrows stronger, and training that day doubles your damage.
+- **Village builder:** a 9 × 12 pixel map with forests, rocks and a river. Training fills the treasury (gold and food per workout, stone per strength set, wood per cardio minute). Place and upgrade 15 buildings: farms, mills, quarries, houses, markets and taverns make more for every workout after they are built, with bonuses for good placement; walls, towers, smiths, temples, stables, libraries and mage towers power Castle Defender. The village is saved on the phone.
+- **Castle Defender:** a tap-to-shoot mini-game. Waves of goblins, bats, orcs, trolls and bosses attack your wall. Your village gives the wall HP, archers, repairs, lightning and slowing patrols; your level, slain bosses and blacksmiths make arrows stronger, and training that day doubles your damage. Plunder goes back to the village.
 - **Retro look:** every screen uses the pixel font, square pixel borders and an RPG colour palette.
 - **History:** every finished workout with sets, total volume and duration.
 - **Coach:** after each workout the coach reviews every exercise and sets your next target:

@@ -38,9 +38,10 @@ import com.gymcoach.game.Badge
 import com.gymcoach.game.Boss
 import com.gymcoach.game.BossFight
 import com.gymcoach.game.BossStatus
-import com.gymcoach.game.Building
 import com.gymcoach.game.Campaign
-import com.gymcoach.game.Castle
+import com.gymcoach.game.City
+import com.gymcoach.game.CityState
+import com.gymcoach.game.TrainingTotals
 import com.gymcoach.game.Island
 import com.gymcoach.game.Loadout
 import com.gymcoach.game.Voyage
@@ -50,6 +51,7 @@ import com.gymcoach.game.Rank
 import com.gymcoach.ui.GymTopBar
 import com.gymcoach.ui.LocalRepository
 import com.gymcoach.ui.theme.RetroButton
+import com.gymcoach.ui.theme.RetroOutlinedButton
 import androidx.compose.ui.platform.LocalContext
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -119,12 +121,13 @@ fun HeroBanner(onClick: () -> Unit) {
     }
 }
 
-private enum class RealmTab { HERO, BOSS, VOYAGE, CASTLE, DEFEND }
+private enum class RealmTab { HERO, BOSS, VOYAGE, VILLAGE, DEFEND }
 
 @Composable
-fun HeroScreen(openDefender: () -> Unit) {
+fun HeroScreen(openDefender: () -> Unit, openCity: () -> Unit) {
     val repo = LocalRepository.current
     val game by repo.game.collectAsStateWithLifecycle(initialValue = null)
+    val city by repo.city.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(RealmTab.HERO) }
     Column(Modifier.fillMaxSize().background(Retro.deep)) {
         GymTopBar("Hero")
@@ -139,8 +142,8 @@ fun HeroScreen(openDefender: () -> Unit) {
                 RealmTab.HERO -> heroItems(g.hero)
                 RealmTab.BOSS -> campaignItems(g.realm.campaign)
                 RealmTab.VOYAGE -> voyageItems(g.realm.voyage)
-                RealmTab.CASTLE -> castleItems(g.realm.castle, openDefender)
-                RealmTab.DEFEND -> defendItems(Loadout.from(g.hero, g.realm, g.trainedToday), openDefender)
+                RealmTab.VILLAGE -> villageItems(city, g.training, openCity, openDefender)
+                RealmTab.DEFEND -> defendItems(Loadout.from(g.hero, g.realm, City.defence(city), g.trainedToday), openDefender)
             }
         }
     }
@@ -356,6 +359,9 @@ private fun LazyListScope.defendItems(l: Loadout, openDefender: () -> Unit) {
                 StatLine("WALL HP", l.wallHp.toString())
                 StatLine("ARROW DAMAGE", l.tapDamage.toString())
                 StatLine("ARCHERS", l.archers.toString())
+                StatLine("REPAIR PER WAVE", l.repair.toString())
+                StatLine("LIGHTNING", l.lightningInterval?.let { "EVERY ${it.toInt()}S" } ?: "NO MAGE TOWER")
+                StatLine("ENEMY SLOW", "${(l.slow * 100).toInt()}%")
                 StatLine("BATTLE RAGE", if (l.rage) "ON ×2" else "OFF")
                 StatLine("BEST WAVE", DefenderRecords.bestWave(context).toString())
                 StatLine("BEST SCORE", DefenderRecords.bestScore(context).toString())
@@ -364,69 +370,33 @@ private fun LazyListScope.defendItems(l: Loadout, openDefender: () -> Unit) {
     }
     item {
         PixelText(
-            "Your training is your army. Wall HP: +3 for every castle building. Archers: one each from the " +
-                "watchtower, barracks, gatehouse and royal tower. Arrow damage: +1 every 5 hero levels and every 2 bosses slain. " +
-                "Trained today? Battle rage doubles your arrows.",
+            "Your training is your army. Wall HP: 10, +5 per town hall level, +4 per wall level. Archers: one per " +
+                "archer tower level. Arrow damage: +1 every 5 hero levels, every 2 bosses slain and every blacksmith level. " +
+                "Temples repair the wall, stables slow enemies, mage towers call lightning and libraries add plunder. " +
+                "Trained today? Battle rage doubles your arrows. Plunder goes to your village.",
             7.sp, Retro.dim,
         )
     }
 }
 
-private fun LazyListScope.castleItems(c: Castle, openDefender: () -> Unit) {
+private fun LazyListScope.villageItems(city: CityState, training: TrainingTotals, openCity: () -> Unit, openDefender: () -> Unit) {
     item {
         RetroPanel {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                CastleScene(c, Modifier.border(2.dp, Retro.night))
-                Row {
-                    PixelText("GOLD ${c.gold}", 9.sp, Retro.gold, Modifier.weight(1f))
-                    PixelText("STONE ${c.stone}", 9.sp, Retro.stone, Modifier.weight(1f))
-                    PixelText("BANNERS ${c.banners}", 9.sp, Retro.hp)
-                }
-                RetroButton(onClick = openDefender, modifier = Modifier.fillMaxWidth()) { Text("Defend the castle") }
-            }
-        }
-    }
-    item {
-        RetroPanel {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                val next = c.next
-                if (next == null) {
-                    PixelText("YOUR CASTLE IS COMPLETE!", 10.sp, Retro.xp)
-                    PixelText("Keep training: banners keep rising for every week you hit your target.", 8.sp)
-                } else {
-                    PixelText("NEXT: ${next.title.uppercase()}", 10.sp, Retro.gold)
-                    PixelText(next.description, 8.sp, Retro.dim)
-                    PixelText("GOLD ${minOf(c.gold, next.gold)}/${next.gold}", 8.sp)
-                    PixelBar(if (next.gold == 0) 1f else c.gold.toFloat() / next.gold, Retro.gold, segments = 16)
-                    PixelText("STONE ${minOf(c.stone, next.stone)}/${next.stone}", 8.sp)
-                    PixelBar(if (next.stone == 0) 1f else c.stone.toFloat() / next.stone, Retro.stone, segments = 16)
-                }
-            }
-        }
-    }
-    item { PixelText("BUILDINGS", 12.sp, Retro.gold) }
-    item {
-        RetroPanel {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Building.entries.forEach { b ->
-                    val built = b in c.built
-                    Row {
-                        Box(Modifier.padding(top = 1.dp).size(8.dp).background(if (built) Retro.xp else Retro.panel))
-                        Spacer(Modifier.width(8.dp))
-                        PixelText(
-                            if (built || b == c.next) b.title.uppercase() else "???",
-                            8.sp, if (built) Retro.parchment else Retro.dim, Modifier.weight(1f),
-                        )
-                        if (!built) PixelText("${b.gold}G ${b.stone}S", 7.sp, Retro.dim)
-                    }
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                CityMap(city, null, Modifier.fillMaxWidth().clickable(onClick = openCity))
+                ResLine(City.treasury(city, training), Retro.gold, showZero = true)
+                PixelText("HALL LV ${City.hallLevel(city)} · ${City.buildingCount(city)}/${City.maxBuildings(city)} BUILDINGS", 8.sp)
+                RetroButton(onClick = openCity, modifier = Modifier.fillMaxWidth()) { Text("Build your village") }
+                RetroOutlinedButton(onClick = openDefender, modifier = Modifier.fillMaxWidth()) { Text("Defend the castle") }
             }
         }
     }
     item {
         PixelText(
-            "Every workout earns 10 gold (+5 in your plan). Every strength set earns 2 stone, every 5 cardio minutes 1 stone. " +
-                "Buildings go up by themselves once you can pay. A banner rises for every week you hit your weekly target.",
+            "Every workout pays 15 gold and 5 food (+5 gold in your plan). Every strength set pays 2 stone, " +
+                "every 3 cardio minutes 1 wood. Farms, mills, quarries, houses, markets and taverns make more for every " +
+                "workout after they are built, so build early. Walls, towers, smiths, temples, stables, libraries and " +
+                "mage towers power Castle Defender.",
             7.sp, Retro.dim,
         )
     }

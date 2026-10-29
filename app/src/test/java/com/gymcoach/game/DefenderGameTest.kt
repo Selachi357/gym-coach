@@ -60,14 +60,30 @@ class DefenderGameTest {
     }
 
     @Test
-    fun trainingBuildsTheLoadout() {
+    fun trainingAndVillageBuildTheLoadout() {
         val hero = HeroCalculator.compute(emptyList(), LocalDate.of(2026, 11, 11))
-        val castle = Castle(0, 0, listOf(Building.CAMPFIRE, Building.PALISADE, Building.STONE_WALL, Building.KEEP, Building.WATCHTOWER), Building.FORGE, 0, 0, 0)
-        val realm = Realm(RealmCalculator.campaign(emptyList(), LocalDate.of(2026, 11, 11), null, 5), RealmCalculator.voyage(emptyList()), castle)
-        val l = Loadout.from(hero, realm, trainedToday = true)
+        val realm = RealmCalculator.compute(emptyList(), LocalDate.of(2026, 11, 11))
+        val city = CityDefence(wallHp = 15, archers = 1, damage = 1, repair = 2, mageLevel = 2, slow = 0.12f)
+        val l = Loadout.from(hero, realm, city, trainedToday = true)
         assertEquals(25, l.wallHp)
         assertEquals(1, l.archers)
-        assertEquals(2, l.tapDamage)
+        assertEquals(4, l.tapDamage)
+        assertEquals(9f, l.lightningInterval!!, 0.001f)
         assertTrue(l.rage)
+    }
+
+    @Test
+    fun templeRepairsTheWallBetweenWaves() {
+        val game = DefenderGame(loadout.copy(wallHp = 100, archers = 6, repair = 5), Random(4))
+        run(game, 25f)
+        assertTrue(game.wave >= 2)
+        assertEquals(100, game.wallHp)
+    }
+
+    @Test
+    fun lightningHitsEveryEnemy() {
+        val game = DefenderGame(loadout.copy(wallHp = 100, mageLevel = 3), Random(5))
+        run(game, 7f)
+        assertTrue(game.kills > 0)
     }
 }

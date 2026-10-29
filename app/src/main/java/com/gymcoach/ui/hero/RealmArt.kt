@@ -10,8 +10,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import com.gymcoach.game.Boss
-import com.gymcoach.game.Building
-import com.gymcoach.game.Castle
 import com.gymcoach.game.Island
 import com.gymcoach.game.Voyage
 import kotlin.math.abs
@@ -299,120 +297,8 @@ val mapPalette = mapOf(
     'b' to Color(0xFF8B5A2B),
 )
 
-// Castle, 64 × 40. Buildings are painted back to front.
-
-fun castleScene(castle: Castle): List<String> {
-    val g = Grid(64, 40, 'n')
-    val has = castle.built.toSet()
-    for (i in 0 until 18) g.set((i * 37 + 5) % 64, (i * 13 + 2) % 22, 'x')
-    g.rect(52, 3, 55, 6, 'm')
-    g.set(52, 3, 'n'); g.set(55, 6, 'n')
-
-    if (Building.GREAT_HALL in has) {
-        g.rect(18, 18, 45, 33, 'h')
-        // A long, low roof: four rows that step in by two pixels.
-        for (i in 0..3) g.rect(17 + i * 2, 17 - i, 46 - i * 2, 17 - i, 'r')
-        for (x in listOf(21, 42)) g.rect(x, 22, x + 1, 24, 'f')
-    }
-    if (Building.KEEP in has) {
-        g.rect(25, 12, 38, 33, 'a')
-        g.crenels(25, 38, 11, 'a')
-        for (y in listOf(15, 21)) {
-            g.rect(28, y, 29, y + 2, 'k')
-            g.rect(34, y, 35, y + 2, 'k')
-        }
-    }
-    if (Building.ROYAL_TOWER in has) {
-        g.rect(29, 4, 34, 11, 'a')
-        g.roof(28, 35, 3, 'y')
-        g.rect(31, 6, 32, 8, 'f')
-    }
-    if (Building.WATCHTOWER in has) {
-        g.rect(5, 10, 11, 33, 'a')
-        g.roof(4, 12, 9, 'r')
-        g.rect(8, 14, 8, 16, 'k')
-    }
-    if (Building.BARRACKS in has) {
-        g.rect(13, 21, 22, 33, 'w')
-        g.roof(12, 23, 20, 'r')
-        g.rect(16, 24, 18, 25, 'k')
-    }
-    if (Building.FORGE in has) {
-        g.rect(44, 22, 51, 33, 'a')
-        g.roof(43, 52, 21, 'k')
-        g.rect(49, 14, 50, 18, 'a')
-        g.set(50, 12, 'o'); g.set(49, 10, 'o'); g.set(51, 9, 'o')
-        g.rect(46, 25, 48, 27, 'f')
-    }
-    if (Building.CHAPEL in has) {
-        g.rect(54, 18, 60, 33, 'w')
-        g.roof(53, 61, 17, 'r')
-        g.rect(57, 9, 57, 13, 'y')
-        g.rect(56, 10, 58, 10, 'y')
-        g.rect(56, 22, 58, 25, 'b')
-    }
-
-    if (Building.STONE_WALL in has) {
-        g.rect(2, 27, 61, 33, 'a')
-        g.crenels(2, 61, 26, 'a')
-        for (y in 28..33 step 2) for (x in 2..61) if ((x + y) % 6 == 0) g.set(x, y, 'k')
-    } else if (Building.PALISADE in has) {
-        for (x in 2..61 step 2) {
-            g.rect(x, 28, x, 33, 'p')
-            g.set(x, 27, 'q')
-        }
-    }
-    if (Building.GATEHOUSE in has) {
-        g.rect(27, 22, 36, 33, 'a')
-        g.crenels(27, 36, 21, 'a')
-        g.rect(29, 26, 34, 33, 'k')
-        for (x in 30..33 step 2) g.rect(x, 27, x, 33, 'q')
-    }
-    // One banner per kept week along the wall top.
-    if (Building.PALISADE in has || Building.STONE_WALL in has) {
-        val spots = listOf(4, 10, 16, 22, 40, 46, 52, 58, 25, 38)
-        spots.take(castle.banners.coerceAtMost(spots.size)).forEachIndexed { i, x ->
-            g.rect(x, 21, x, 25, 'k')
-            g.rect(x + 1, 21, x + 2, 23, if (i % 2 == 0) 'r' else 'y')
-        }
-    }
-
-    g.rect(0, 34, 63, 39, 'e')
-    g.rect(0, 34, 63, 34, 'g')
-    for (x in 0 until 64 step 5) g.set(x, 37 + (x / 5) % 2, 'g')
-    // The campfire is always there.
-    g.rect(30, 37, 34, 37, 'b')
-    g.set(32, 34, 'o'); g.rect(31, 35, 33, 36, 'f'); g.set(32, 35, 'o')
-    return g.rows()
-}
-
-val castlePalette = mapOf(
-    'n' to Color(0xFF151530),
-    'x' to Retro.parchment,
-    'm' to Color(0xFFF3E9C0),
-    'a' to Color(0xFF8C8FA3),
-    'h' to Color(0xFF6B5A4A),
-    'w' to Color(0xFFB09878),
-    'r' to Color(0xFFB03030),
-    'y' to Retro.gold,
-    'k' to Color(0xFF1B1B2F),
-    'f' to Retro.ember,
-    'o' to Color(0xFFFFD84A),
-    'b' to Color(0xFF6B4423),
-    'p' to Color(0xFF8B5A2B),
-    'q' to Color(0xFF5C3A1E),
-    'e' to Color(0xFF3B2A1E),
-    'g' to Color(0xFF3FA34D),
-)
-
 @Composable
 fun VoyageMap(voyage: Voyage, modifier: Modifier = Modifier) {
     val rows = remember(voyage) { voyageMap(voyage) }
     PixelPicture(rows, mapPalette, modifier)
-}
-
-@Composable
-fun CastleScene(castle: Castle, modifier: Modifier = Modifier) {
-    val rows = remember(castle) { castleScene(castle) }
-    PixelPicture(rows, castlePalette, modifier)
 }

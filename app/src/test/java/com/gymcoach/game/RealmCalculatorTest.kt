@@ -88,22 +88,11 @@ class RealmCalculatorTest {
     }
 
     @Test
-    fun castleBuildsInOrderWhenAffordable() {
-        // 3 workouts: 45 gold, 60 stone → palisade (20/15) and stone wall (40/40) need 60 gold, so only the palisade.
-        val c = RealmCalculator.castle(List(3) { strength(start.plusDays(it.toLong())) }, keptWeeks = 1)
-        assertEquals(listOf(Building.CAMPFIRE, Building.PALISADE), c.built)
-        assertEquals(Building.STONE_WALL, c.next)
-        assertEquals(25, c.gold)
-        assertEquals(1, c.banners)
-    }
-
-    @Test
     fun celebrateReportsNewThings() {
         val before = RealmCalculator.compute(emptyList(), start, start)
-        val after = RealmCalculator.compute(planWeek(start), start.plusDays(5), start, keptWeeks = 1)
+        val after = RealmCalculator.compute(planWeek(start), start.plusDays(5), start)
         val messages = RealmCalculator.celebrate(before, after)
         assertTrue(messages.any { it.contains("defeated") })
-        assertTrue(messages.any { it.contains("Palisade") })
-        assertTrue(messages.any { it.contains("banner") })
+        assertTrue(messages.any { it.contains("Gull Rock") })
     }
 }

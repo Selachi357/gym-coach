@@ -11,28 +11,38 @@ enum class Foe(val title: String, val hp: Int, val speed: Float, val damage: Int
     BOSS("Boss", 20, 0.035f, 10, 2.2f, 25),
 }
 
-/** What your training gives you in the game. */
+/** What your training and your village give you in the game. */
 data class Loadout(
     val wallHp: Int,
     val tapDamage: Int,
     val archers: Int,
     /** Trained today: every tap does double damage. */
     val rage: Boolean,
+    /** Wall HP repaired after every wave. */
+    val repair: Int = 0,
+    /** Mage tower level: 0 is none. */
+    val mageLevel: Int = 0,
+    /** Share of enemy speed taken off by the stable's patrols. */
+    val slow: Float = 0f,
 ) {
-    companion object {
-        private val archerBuildings = setOf(Building.WATCHTOWER, Building.BARRACKS, Building.GATEHOUSE, Building.ROYAL_TOWER)
+    /** Seconds between lightning strikes, or null without a mage tower. */
+    val lightningInterval: Float? get() = if (mageLevel > 0) 12f - 3f * (mageLevel - 1) else null
 
+    companion object {
         /**
-         * Castle buildings give the wall its HP and the towers and barracks give archers.
+         * The village gives the wall, archers, smiths, repairs, mages and patrols.
          * Hero level and slain bosses make your arrows hit harder; a workout today doubles them.
          */
-        fun from(hero: HeroStats, realm: Realm, trainedToday: Boolean): Loadout {
-            val base = 1 + hero.level / 5 + realm.campaign.bossesDefeated / 2
+        fun from(hero: HeroStats, realm: Realm, city: CityDefence, trainedToday: Boolean): Loadout {
+            val base = 1 + hero.level / 5 + realm.campaign.bossesDefeated / 2 + city.damage
             return Loadout(
-                wallHp = 10 + 3 * realm.castle.built.size,
+                wallHp = 10 + city.wallHp,
                 tapDamage = if (trainedToday) base * 2 else base,
-                archers = realm.castle.built.count { it in archerBuildings },
+                archers = city.archers,
                 rage = trainedToday,
+                repair = city.repair,
+                mageLevel = city.mageLevel,
+                slow = city.slow,
             )
         }
     }
@@ -80,12 +90,16 @@ class DefenderGame(val loadout: Loadout, private val random: Random = Random.Def
     /** Seconds the wall stays red after a hit. */
     var wallFlash = 0f
         private set
+    /** Seconds the lightning flash stays on screen. */
+    var lightningFlash = 0f
+        private set
 
     private var nextId = 0
     private var queue = waveQueue(1)
     private var spawnTimer = 1.0f
     private var archerTimer = ARCHER_INTERVAL
     private var pause = 0f
+    private var lightningTimer = loadout.lightningInterval ?: 0f
 
     fun waveQueue(w: Int): MutableList<Foe> {
         val list = mutableListOf<Foe>()
@@ -106,7 +120,7 @@ class DefenderGame(val loadout: Loadout, private val random: Random = Random.Def
 
     private fun spawn(foe: Foe) {
         val hp = if (foe == Foe.BOSS) 20 + 8 * wave else foe.hp + (wave - 1) / 4
-        enemies += Enemy(nextId++, foe, hp, random.nextInt(LANES), foe.speed * (1 + 0.04f * (wave - 1)))
+        enemies += Enemy(nextId++, foe, hp, random.nextInt(LANES), foe.speed * (1 + 0.04f * (wave - 1)) * (1 - loadout.slow))
     }
 
     /** Advances the game by [dt] seconds. */
@@ -114,6 +128,7 @@ class DefenderGame(val loadout: Loadout, private val random: Random = Random.Def
         if (over) return
         waveBanner = (waveBanner - dt).coerceAtLeast(0f)
         wallFlash = (wallFlash - dt).coerceAtLeast(0f)
+        lightningFlash = (lightningFlash - dt).coerceAtLeast(0f)
         shots.forEach { it.ttl -= dt }
         shots.removeAll { it.ttl <= 0f }
 
@@ -121,6 +136,7 @@ class DefenderGame(val loadout: Loadout, private val random: Random = Random.Def
             pause += dt
             if (pause >= WAVE_PAUSE) {
                 score += 10 * wave
+                wallHp = minOf(loadout.wallHp, wallHp + loadout.repair)
                 wave++
                 queue = waveQueue(wave)
                 pause = 0f
@@ -147,6 +163,19 @@ class DefenderGame(val loadout: Loadout, private val random: Random = Random.Def
             }
         }
 
+        val interval = loadout.lightningInterval
+        if (interval != null) {
+            lightningTimer -= dt
+            if (lightningTimer <= 0f) {
+                lightningTimer = interval
+                val targets = enemies.filter { it.x < 1f }
+                if (targets.isNotEmpty()) {
+                    lightningFlash = 0.25f
+                    targets.forEach { damage(it, 3, fromArcher = true, drawShot = false) }
+                }
+            }
+        }
+
         if (loadout.archers > 0) {
             archerTimer -= dt
             if (archerTimer <= 0f) {
@@ -167,8 +196,8 @@ class DefenderGame(val loadout: Loadout, private val random: Random = Random.Def
         return true
     }
 
-    private fun damage(target: Enemy, amount: Int, fromArcher: Boolean) {
-        shots += Shot(target.x, target.lane, fromArcher, SHOT_TTL)
+    private fun damage(target: Enemy, amount: Int, fromArcher: Boolean, drawShot: Boolean = true) {
+        if (drawShot) shots += Shot(target.x, target.lane, fromArcher, SHOT_TTL)
         target.hp -= amount
         target.flash = 0.1f
         if (target.hp <= 0) {

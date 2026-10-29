@@ -11,11 +11,16 @@ import com.gymcoach.coach.ProgramFocus
 import com.gymcoach.coach.ProgramPlanner
 import com.gymcoach.coach.formatKg
 import com.gymcoach.game.HeroCalculator
+import com.gymcoach.game.City
+import com.gymcoach.game.CityState
 import com.gymcoach.game.HeroStats
+import com.gymcoach.game.Res
+import com.gymcoach.game.TrainingTotals
 import com.gymcoach.game.Realm
 import com.gymcoach.game.RealmCalculator
 import com.gymcoach.game.SetRecord
 import com.gymcoach.game.WorkoutRecord
+import java.io.File
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -23,12 +28,34 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
-class GymRepository(private val db: GymDatabase) {
+class GymRepository(private val db: GymDatabase, private val cityFile: File) {
     private val dao = db.dao()
+
+    // The village is the only game state the player chooses, so it is saved to its own small file.
+    private val cityState = MutableStateFlow(runCatching { City.decode(cityFile.readText()) }.getOrDefault(CityState()))
+    val city: StateFlow<CityState> = cityState
+
+    private val cityLock = Mutex()
+
+    /** Applies a village action against the current training totals and saves the result. */
+    suspend fun updateCity(action: (CityState, TrainingTotals) -> CityState) = cityLock.withLock {
+        val next = action(cityState.value, gameNow().training)
+        withContext(Dispatchers.IO) { cityFile.writeText(City.encode(next)) }
+        cityState.value = next
+    }
+
+    /** Brings plunder home from Castle Defender. */
+    suspend fun addPlunder(plunder: Res) = updateCity { state, _ -> state.copy(loot = state.loot + plunder) }
 
     val exercises: Flow<List<Exercise>> = dao.exercises()
     val targets: Flow<List<ExerciseTarget>> = dao.targets()
@@ -46,7 +73,7 @@ class GymRepository(private val db: GymDatabase) {
     fun sessionPlans(sessionId: Long): Flow<List<SessionExercise>> = dao.sessionPlans(sessionId)
     val activeProgram: Flow<Program?> = dao.activeProgram()
 
-    /** XP, level, rank, streak and quests, plus the campaign, voyage and castle, recomputed whenever the log changes. */
+    /** XP, level, rank, streak and quests, plus the campaign, voyage and village income, recomputed whenever the log changes. */
     val game: Flow<GameState> = combine(
         dao.finishedSessions(), dao.finishedSets(), dao.exercises(), dao.goals(), dao.activeProgram(),
     ) { sessions, sets, exercises, goals, program ->
@@ -87,9 +114,8 @@ class GymRepository(private val db: GymDatabase) {
             today,
             campaignStart = program?.let { Instant.ofEpochMilli(it.startedAt).atZone(zone).toLocalDate() },
             sessionsPerWeek = program?.let { ProgramPlanner.workoutsPerWeek(it.focusEnum(), it.daysPerWeek) } ?: weeklyTarget,
-            keptWeeks = hero.keptWeeks,
         )
-        return GameState(hero, realm, trainedToday = records.any { it.date == today })
+        return GameState(hero, realm, trainedToday = records.any { it.date == today }, training = TrainingTotals.of(records))
     }
     fun finishedProgramSessions(programId: Long): Flow<List<WorkoutSession>> = dao.finishedProgramSessions(programId)
 
@@ -227,9 +253,15 @@ class GymRepository(private val db: GymDatabase) {
         messages += programProgress(session)
         messages += checkGoals()
         val gameAfter = gameNow()
+        val village = cityState.value
+        val earned = City.treasury(village, gameAfter.training) - City.treasury(village, gameBefore.training)
         val celebration = HeroCalculator.celebrate(gameBefore.hero, gameAfter.hero) +
-            RealmCalculator.celebrate(gameBefore.realm, gameAfter.realm)
-        celebration.filter { !it.startsWith("+") && !it.startsWith("Strike!") }.forEach {
+            RealmCalculator.celebrate(gameBefore.realm, gameAfter.realm) +
+            listOfNotNull(
+                "Village: +${earned.gold} gold, +${earned.wood} wood, +${earned.stone} stone, +${earned.food} food."
+                    .takeIf { !earned.isZero },
+            )
+        celebration.filter { !it.startsWith("+") && !it.startsWith("Strike!") && !it.startsWith("Village:") }.forEach {
             dao.insertCoachNote(CoachNote(message = it, createdAt = System.currentTimeMillis()))
         }
         return celebration + messages
@@ -451,4 +483,4 @@ fun ExerciseTarget.withPlan(plan: SessionExercise) = copy(
     sets = plan.plannedSets ?: sets,
 )
 
-data class GameState(val hero: HeroStats, val realm: Realm, val trainedToday: Boolean)
+data class GameState(val hero: HeroStats, val realm: Realm, val trainedToday: Boolean, val training: TrainingTotals)

@@ -16,7 +16,7 @@ class GymCoachApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        repository = GymRepository(GymDatabase.create(this))
+        repository = GymRepository(GymDatabase.create(this), java.io.File(filesDir, "city.txt"))
         appScope.launch { repository.seedIfEmpty() }
         Reminders.ensureChannel(this)
         Reminders.schedule(this)
