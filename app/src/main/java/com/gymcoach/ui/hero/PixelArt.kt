@@ -24,6 +24,10 @@ object Retro {
     val ember = Color(0xFFFF7A1A)
     val xp = Color(0xFF4CD964)
     val dim = Color(0xFF6B6B8A)
+    val deep = Color(0xFF12121F)
+    val hp = Color(0xFFE04040)
+    val sea = Color(0xFF3FC1E0)
+    val stone = Color(0xFFB0B8C8)
 }
 
 /** Draws a grid of characters as square pixels; '.' is transparent. */
@@ -238,6 +242,9 @@ private val badgeArt: Map<Badge, List<String>> = mapOf(
     Badge.SCROLL to listOf(
         ".######.", "#+####+#", ".#++++#.", ".#+##+#.", ".#++++#.", ".#+##+#.", "#+####+#", ".######.",
     ),
+    Badge.CHEST to listOf(
+        "........", ".######.", "#++++++#", "########", "#++##++#", "#++++++#", "########", "........",
+    ),
     Badge.DRAGON to listOf(
         "#.....#.", "##...##.", ".#####..", "##+####.", "#######.", ".###..##", ".##.....", "##......",
     ),
@@ -254,6 +261,7 @@ private val badgeColors: Map<Badge, Pair<Color, Color>> = mapOf(
     Badge.CUP to (Retro.gold to Color(0xFFFFF2A8)),
     Badge.SCROLL to (Retro.parchment to Color(0xFF8B5A2B)),
     Badge.DRAGON to (Color(0xFF3FA34D) to Color(0xFFB03030)),
+    Badge.CHEST to (Color(0xFF8B5A2B) to Retro.gold),
 )
 
 @Composable
@@ -261,4 +269,24 @@ fun PixelBadge(badge: Badge, unlocked: Boolean, size: Dp, modifier: Modifier = M
     val (main, accent) = badgeColors.getValue(badge)
     val palette = if (unlocked) mapOf('#' to main, '+' to accent) else mapOf('#' to Retro.dim, '+' to Retro.panel)
     PixelSprite(badgeArt.getValue(badge), palette, size, modifier)
+}
+
+/** Icons for the bottom bar, drawn in one color with a darker accent. */
+enum class PixelIcon { HOME, DUMBBELL, SHIELD, CUP, SCROLL }
+
+private val iconArt: Map<PixelIcon, List<String>> = mapOf(
+    PixelIcon.HOME to listOf(
+        "...##...", "..####..", ".######.", "########", ".#+##+#.", ".#+##+#.", ".##++##.", ".##++##.",
+    ),
+    PixelIcon.DUMBBELL to listOf(
+        "........", "#......#", "##....##", "########", "########", "##....##", "#......#", "........",
+    ),
+    PixelIcon.SHIELD to badgeArt.getValue(Badge.SHIELD),
+    PixelIcon.CUP to badgeArt.getValue(Badge.CUP),
+    PixelIcon.SCROLL to badgeArt.getValue(Badge.SCROLL),
+)
+
+@Composable
+fun PixelIconImage(icon: PixelIcon, color: Color, size: Dp, modifier: Modifier = Modifier) {
+    PixelSprite(iconArt.getValue(icon), mapOf('#' to color, '+' to Retro.night), size, modifier)
 }

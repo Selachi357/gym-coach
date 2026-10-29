@@ -12,6 +12,8 @@ import com.gymcoach.coach.ProgramPlanner
 import com.gymcoach.coach.formatKg
 import com.gymcoach.game.HeroCalculator
 import com.gymcoach.game.HeroStats
+import com.gymcoach.game.Realm
+import com.gymcoach.game.RealmCalculator
 import com.gymcoach.game.SetRecord
 import com.gymcoach.game.WorkoutRecord
 import java.time.DayOfWeek
@@ -23,6 +25,7 @@ import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 
 class GymRepository(private val db: GymDatabase) {
     private val dao = db.dao()
@@ -43,20 +46,25 @@ class GymRepository(private val db: GymDatabase) {
     fun sessionPlans(sessionId: Long): Flow<List<SessionExercise>> = dao.sessionPlans(sessionId)
     val activeProgram: Flow<Program?> = dao.activeProgram()
 
-    /** XP, level, rank, streak and quests, recomputed whenever the log changes. */
-    val hero: Flow<HeroStats> = combine(dao.finishedSessions(), dao.finishedSets(), dao.exercises(), dao.goals()) { sessions, sets, exercises, goals ->
-        buildHero(sessions, sets, exercises, goals)
+    /** XP, level, rank, streak and quests, plus the campaign, voyage and castle, recomputed whenever the log changes. */
+    val game: Flow<GameState> = combine(
+        dao.finishedSessions(), dao.finishedSets(), dao.exercises(), dao.goals(), dao.activeProgram(),
+    ) { sessions, sets, exercises, goals, program ->
+        buildGame(sessions, sets, exercises, goals, program)
     }
 
-    suspend fun heroNow(): HeroStats =
-        buildHero(dao.getFinishedSessions(), dao.getFinishedSets(), dao.allExercises(), dao.allGoals())
+    val hero: Flow<HeroStats> = game.map { it.hero }
 
-    private fun buildHero(
+    suspend fun gameNow(): GameState =
+        buildGame(dao.getFinishedSessions(), dao.getFinishedSets(), dao.allExercises(), dao.allGoals(), dao.getActiveProgram())
+
+    private fun buildGame(
         sessions: List<WorkoutSession>,
         sets: List<SetEntry>,
         exercises: List<Exercise>,
         goals: List<Goal>,
-    ): HeroStats {
+        program: Program?,
+    ): GameState {
         val cardio = exercises.filter { it.isCardio }.map { it.id }.toSet()
         val setsBySession = sets.groupBy { it.sessionId }
         val zone = ZoneId.systemDefault()
@@ -71,7 +79,17 @@ class GymRepository(private val db: GymDatabase) {
         }
         val weeklyTarget = goals.firstOrNull { it.type == GoalType.WEEKLY_SESSIONS && it.achievedAt == null }
             ?.target?.toInt()?.coerceAtLeast(1) ?: 3
-        return HeroCalculator.compute(records, LocalDate.now(), weeklyTarget)
+        val today = LocalDate.now()
+        val hero = HeroCalculator.compute(records, today, weeklyTarget)
+        // The campaign follows the plan's weeks; without a plan it starts on the Monday of your first workout.
+        val realm = RealmCalculator.compute(
+            records,
+            today,
+            campaignStart = program?.let { Instant.ofEpochMilli(it.startedAt).atZone(zone).toLocalDate() },
+            sessionsPerWeek = program?.let { ProgramPlanner.workoutsPerWeek(it.focusEnum(), it.daysPerWeek) } ?: weeklyTarget,
+            keptWeeks = hero.keptWeeks,
+        )
+        return GameState(hero, realm)
     }
     fun finishedProgramSessions(programId: Long): Flow<List<WorkoutSession>> = dao.finishedProgramSessions(programId)
 
@@ -175,7 +193,7 @@ class GymRepository(private val db: GymDatabase) {
             dao.deleteSession(sessionId)
             return listOf("No sets were logged, so I didn't save this workout.")
         }
-        val heroBefore = heroNow()
+        val gameBefore = gameNow()
         dao.updateSession(session.copy(endedAt = System.currentTimeMillis()))
 
         val messages = mutableListOf<String>()
@@ -208,8 +226,10 @@ class GymRepository(private val db: GymDatabase) {
         }
         messages += programProgress(session)
         messages += checkGoals()
-        val celebration = HeroCalculator.celebrate(heroBefore, heroNow())
-        celebration.filter { !it.startsWith("+") }.forEach {
+        val gameAfter = gameNow()
+        val celebration = HeroCalculator.celebrate(gameBefore.hero, gameAfter.hero) +
+            RealmCalculator.celebrate(gameBefore.realm, gameAfter.realm)
+        celebration.filter { !it.startsWith("+") && !it.startsWith("Strike!") }.forEach {
             dao.insertCoachNote(CoachNote(message = it, createdAt = System.currentTimeMillis()))
         }
         return celebration + messages
@@ -430,3 +450,5 @@ fun ExerciseTarget.withPlan(plan: SessionExercise) = copy(
     reps = plan.plannedReps ?: reps,
     sets = plan.plannedSets ?: sets,
 )
+
+data class GameState(val hero: HeroStats, val realm: Realm)

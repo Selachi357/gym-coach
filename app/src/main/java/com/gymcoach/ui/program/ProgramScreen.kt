@@ -16,8 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -25,7 +23,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -53,6 +50,9 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
+import com.gymcoach.ui.theme.RetroCard
+import com.gymcoach.ui.theme.RetroButton
+import com.gymcoach.ui.theme.RetroOutlinedButton
 
 private val dayMonth: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM")
 
@@ -90,7 +90,7 @@ private fun ProgramSetup() {
     ) {
         item { Text("Choose a plan", style = MaterialTheme.typography.titleMedium) }
         items(ProgramFocus.entries.toList()) { f ->
-            Card(
+            RetroCard(
                 onClick = { focus = f },
                 colors = CardDefaults.cardColors(
                     containerColor = if (focus == f) MaterialTheme.colorScheme.primaryContainer
@@ -111,7 +111,7 @@ private fun ProgramSetup() {
                     "Day 1 of the 7-day cycle. The plan runs 6 weeks from here.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                OutlinedButton(onClick = { pickDate = true }) { Text(startDate.format(dayMonth)) }
+                RetroOutlinedButton(onClick = { pickDate = true }) { Text(startDate.format(dayMonth)) }
             }
         } else {
             item {
@@ -129,7 +129,7 @@ private fun ProgramSetup() {
             }
         }
         item {
-            Button(
+            RetroButton(
                 onClick = { scope.launch { repo.startProgram(days, focus, startDate) } },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Create my program") }
@@ -201,7 +201,7 @@ private fun ProgramOverview(program: Program) {
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.secondary,
                     )
-                    OutlinedButton(onClick = { scope.launch { repo.shiftProgram(program) } }) {
+                    RetroOutlinedButton(onClick = { scope.launch { repo.shiftProgram(program) } }) {
                         Text("Shift one day (watch switch)")
                     }
                 }
@@ -210,7 +210,7 @@ private fun ProgramOverview(program: Program) {
         items((1..ProgramPlanner.WEEKS).toList()) { week ->
             val scheme = ProgramPlanner.scheme(focus, week)
             val current = currentWeek == week
-            Card(
+            RetroCard(
                 colors = CardDefaults.cardColors(
                     containerColor = if (current) MaterialTheme.colorScheme.primaryContainer
                     else MaterialTheme.colorScheme.surfaceVariant,

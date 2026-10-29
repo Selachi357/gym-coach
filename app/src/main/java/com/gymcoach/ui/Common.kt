@@ -6,7 +6,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.dp
+import com.gymcoach.ui.hero.Retro
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.RowScope
 import com.gymcoach.data.isTimed
@@ -21,7 +29,7 @@ fun GymTopBar(
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     TopAppBar(
-        title = { Text(title) },
+        title = { Text(title.uppercase(), style = MaterialTheme.typography.titleLarge, color = Retro.gold) },
         navigationIcon = {
             if (back != null) {
                 IconButton(onClick = back) {
@@ -30,6 +38,16 @@ fun GymTopBar(
             }
         },
         actions = actions,
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Retro.night,
+            navigationIconContentColor = Retro.gold,
+            actionIconContentColor = Retro.gold,
+        ),
+        modifier = Modifier.drawBehind {
+            // Gold pixel rule under every title bar.
+            val h = 3.dp.toPx()
+            drawRect(Retro.gold, topLeft = Offset(0f, size.height - h), size = Size(size.width, h))
+        },
     )
 }
 

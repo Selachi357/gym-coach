@@ -1,24 +1,24 @@
 package com.gymcoach.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.FitnessCenter
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -35,6 +35,9 @@ import com.gymcoach.ui.history.HistoryScreen
 import com.gymcoach.ui.history.SessionDetailScreen
 import com.gymcoach.ui.guide.GuideScreen
 import com.gymcoach.ui.hero.HeroScreen
+import com.gymcoach.ui.hero.PixelIcon
+import com.gymcoach.ui.hero.PixelIconImage
+import com.gymcoach.ui.hero.Retro
 import com.gymcoach.ui.home.HomeScreen
 import com.gymcoach.ui.settings.SettingsScreen
 import com.gymcoach.ui.program.ProgramScreen
@@ -43,14 +46,14 @@ import com.gymcoach.ui.workout.WorkoutScreen
 
 val LocalRepository = staticCompositionLocalOf<GymRepository> { error("No repository provided") }
 
-private data class Tab(val route: String, val label: String, val icon: ImageVector)
+private data class Tab(val route: String, val label: String, val icon: PixelIcon)
 
 private val tabs = listOf(
-    Tab("home", "Home", Icons.Filled.Home),
-    Tab("exercises", "Exercises", Icons.Filled.FitnessCenter),
-    Tab("hero", "Hero", Icons.Filled.Shield),
-    Tab("goals", "Goals", Icons.Filled.EmojiEvents),
-    Tab("history", "History", Icons.Filled.History),
+    Tab("home", "Home", PixelIcon.HOME),
+    Tab("exercises", "Lifts", PixelIcon.DUMBBELL),
+    Tab("hero", "Hero", PixelIcon.SHIELD),
+    Tab("goals", "Goals", PixelIcon.CUP),
+    Tab("history", "Log", PixelIcon.SCROLL),
 )
 
 object Routes {
@@ -71,14 +74,25 @@ fun GymCoachRoot() {
         contentWindowInsets = WindowInsets.navigationBars,
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar {
-                    tabs.forEach { tab ->
-                        NavigationBarItem(
-                            selected = currentRoute == tab.route,
-                            onClick = { nav.navigateTab(tab.route) },
-                            icon = { Icon(tab.icon, contentDescription = null) },
-                            label = { Text(tab.label) },
-                        )
+                Column {
+                    Box(Modifier.fillMaxWidth().height(3.dp).background(Retro.gold))
+                    NavigationBar(containerColor = Retro.night) {
+                        tabs.forEach { tab ->
+                            val selected = currentRoute == tab.route
+                            NavigationBarItem(
+                                selected = selected,
+                                onClick = { nav.navigateTab(tab.route) },
+                                icon = { PixelIconImage(tab.icon, if (selected) Retro.gold else Retro.dim, 24.dp) },
+                                label = {
+                                    Text(
+                                        tab.label.uppercase(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (selected) Retro.gold else Retro.dim,
+                                    )
+                                },
+                                colors = NavigationBarItemDefaults.colors(indicatorColor = Retro.panel),
+                            )
+                        }
                     }
                 }
             }

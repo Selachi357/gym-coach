@@ -13,11 +13,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,6 +39,8 @@ import com.gymcoach.ui.LocalRepository
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
+import com.gymcoach.ui.theme.RetroCard
+import com.gymcoach.ui.theme.RetroOutlinedButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,7 +97,7 @@ fun SettingsScreen(back: () -> Unit) {
 
             Text("Your watch", style = MaterialTheme.typography.titleMedium)
             Watch.entries.forEach { watch ->
-                Card(
+                RetroCard(
                     onClick = { update(settings.copy(watch = watch)) },
                     colors = CardDefaults.cardColors(
                         containerColor = if (settings.watch == watch) MaterialTheme.colorScheme.primaryContainer
@@ -112,7 +112,7 @@ fun SettingsScreen(back: () -> Unit) {
                 }
             }
             if (settings.watch == Watch.CUSTOM) {
-                OutlinedButton(onClick = { pickTime = true }) {
+                RetroOutlinedButton(onClick = { pickTime = true }) {
                     Text("Reminder at ${settings.customTime.format(DateTimeFormatter.ofPattern("HH:mm"))}")
                 }
             }
@@ -121,7 +121,7 @@ fun SettingsScreen(back: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
             )
 
-            OutlinedButton(onClick = {
+            RetroOutlinedButton(onClick = {
                 scope.launch {
                     val (title, text) = Reminders.reminderText(repo.currentProgramStatus())
                         ?: ("No session today" to "Rest day. Reminders skip days like this.")

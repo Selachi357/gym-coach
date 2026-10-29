@@ -19,7 +19,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
+import com.gymcoach.ui.theme.RetroCard
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -119,7 +119,7 @@ fun GoalsScreen() {
 private fun GoalCard(goal: Goal, title: String, current: Double, onDelete: () -> Unit) {
     val achieved = goal.achievedAt != null
     val progress = if (achieved) 1f else (current / goal.target).toFloat().coerceIn(0f, 1f)
-    Card {
+    RetroCard {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (achieved) {

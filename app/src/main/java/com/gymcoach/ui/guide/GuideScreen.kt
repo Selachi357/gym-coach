@@ -8,13 +8,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.gymcoach.ui.GymTopBar
+import com.gymcoach.ui.theme.RetroCard
 
 /** Text from the onboard training plan: how it works, watch times, safety, warm-up and recovery. */
 object Guide {
@@ -103,7 +103,7 @@ fun GuideScreen(back: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(Guide.sections) { section ->
-                Card(Modifier.fillMaxWidth()) {
+                RetroCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(section.title, style = MaterialTheme.typography.titleMedium)
                         section.lines.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }

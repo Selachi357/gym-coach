@@ -11,6 +11,10 @@ An offline-first Android workout log with a built-in coach. Everything is stored
 - **Onboard plan:** the 6-week ship plan (3 strength + 2 cardio sessions per 7-day cycle, Learn/Build/Push phases) with rower intervals, crosstrainer sessions, a "shift one day" button for watch switches, and a guide with watch times, warm-up, safety and recovery.
 - **Reminders:** a daily notification with today's session, timed for your watch (day watch 18:30, night watch 14:00, or custom). Rest days stay quiet.
 - **Hero (level-up system):** earn XP for workouts, sets, records and streaks; rank up from Peasant to Legend of the Realm with a pixel-art hero that gains gear; complete quests for badges. Everything is computed from your log.
+- **Boss campaign:** six weeks, six bosses, from the Bilge Rat King to the Dragon of the Deep. Workouts deal damage; beat each boss before Sunday ends to claim its loot.
+- **Voyage map:** cardio km sail your ship across a pixel sea to ten islands; strength workouts open their treasure chests.
+- **Castle builder:** workouts earn gold and sets earn stone; your castle grows from a campfire to a royal tower, with a banner for every week you hit your target.
+- **Retro look:** every screen uses the pixel font, square pixel borders and an RPG colour palette.
 - **History:** every finished workout with sets, total volume and duration.
 - **Coach:** after each workout the coach reviews every exercise and sets your next target:
   - All sets done at effort 8 or lower → +2.5 kg (or +1 rep for bodyweight moves; harder variant at 15 reps).

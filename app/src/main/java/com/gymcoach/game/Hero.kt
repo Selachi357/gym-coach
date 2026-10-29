@@ -39,7 +39,7 @@ enum class Rank(val title: String, val minLevel: Int, val flavor: String) {
     }
 }
 
-enum class Badge { SWORD, FLAME, SHIELD, STAR, CROWN, BOOT, WAVE, CUP, SCROLL, DRAGON }
+enum class Badge { SWORD, FLAME, SHIELD, STAR, CROWN, BOOT, WAVE, CUP, SCROLL, DRAGON, CHEST }
 
 /** Quests that unlock rewards. [progress] returns (current, goal). */
 enum class Quest(val title: String, val description: String, val badge: Badge) {
@@ -69,6 +69,8 @@ data class HeroStats(
     val rank: Rank,
     val weekStreak: Int,
     val bestWeekStreak: Int,
+    /** Weeks (in total, not in a row) that hit the weekly target. */
+    val keptWeeks: Int,
     /** Workouts so far this week, towards [weeklyTarget]. */
     val thisWeek: Int,
     val weeklyTarget: Int,
@@ -204,6 +206,7 @@ object HeroCalculator {
             rank = Rank.forLevel(level),
             weekStreak = streak,
             bestWeekStreak = bestStreak,
+            keptWeeks = kept.size,
             thisWeek = perWeek[currentWeek] ?: 0,
             weeklyTarget = weeklyTarget,
             workouts = sorted.size,

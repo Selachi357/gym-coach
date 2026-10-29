@@ -15,8 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SportsGymnastics
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,6 +34,8 @@ import com.gymcoach.ui.GymTopBar
 import com.gymcoach.ui.LocalRepository
 import com.gymcoach.ui.formatDateTime
 import kotlinx.coroutines.launch
+import com.gymcoach.ui.theme.RetroCard
+import com.gymcoach.ui.theme.RetroButton
 
 @Composable
 fun HomeScreen(
@@ -66,7 +66,7 @@ fun HomeScreen(
         ) {
             item { com.gymcoach.ui.hero.HeroBanner(onClick = openHero) }
             item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                RetroCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                     Column(Modifier.fillMaxWidth().padding(20.dp)) {
                         val session = active
                         Text(
@@ -77,7 +77,7 @@ fun HomeScreen(
                             Text("Started ${formatDateTime(session.startedAt)}", style = MaterialTheme.typography.bodyMedium)
                         }
                         Spacer(Modifier.size(12.dp))
-                        Button(
+                        RetroButton(
                             onClick = {
                                 if (session != null) openWorkout(session.id)
                                 else scope.launch { openWorkout(repo.startSession()) }
@@ -93,7 +93,7 @@ fun HomeScreen(
             item {
                 val p = program
                 if (p == null) {
-                    Card(onClick = openProgram) {
+                    RetroCard(onClick = openProgram) {
                         Column(Modifier.fillMaxWidth().padding(16.dp)) {
                             Text("Get a 6-week program", style = MaterialTheme.typography.titleMedium)
                             Text(
@@ -112,7 +112,7 @@ fun HomeScreen(
                 }
             }
             item {
-                Card {
+                RetroCard {
                     Column(Modifier.fillMaxWidth().padding(16.dp)) {
                         Text("This week", style = MaterialTheme.typography.titleMedium)
                         if (weeklyGoal != null) {
@@ -145,7 +145,7 @@ fun HomeScreen(
                 }
             }
             items(notes, key = { it.id }) { note ->
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                RetroCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
                     Column(Modifier.fillMaxWidth().padding(14.dp)) {
                         Text(note.message, style = MaterialTheme.typography.bodyMedium)
                         Text(
@@ -173,7 +173,7 @@ private fun ProgramHomeCard(
     val status = repo.programStatus(program, finished)
     val next = (status as? com.gymcoach.data.ProgramStatus.Next)?.plan
     val total = com.gymcoach.coach.ProgramPlanner.WEEKS * program.daysPerWeek
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
+    RetroCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             val (title, detail) = when (status) {
                 is com.gymcoach.data.ProgramStatus.Next ->
@@ -197,7 +197,7 @@ private fun ProgramHomeCard(
             Text("${finished.size} of $total workouts done", style = MaterialTheme.typography.labelMedium)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (next != null && !hasActiveSession) {
-                    Button(onClick = onStart) { Text("Start today's workout") }
+                    RetroButton(onClick = onStart) { Text("Start today's workout") }
                 }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = openProgram) { Text("View plan") }

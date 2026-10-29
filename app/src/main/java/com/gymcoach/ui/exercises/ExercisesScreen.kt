@@ -16,7 +16,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -40,6 +39,7 @@ import com.gymcoach.ui.LocalRepository
 import com.gymcoach.ui.describeSet
 import com.gymcoach.ui.formatDate
 import com.gymcoach.ui.formatTarget
+import com.gymcoach.ui.theme.RetroCard
 
 @Composable
 fun ExercisesScreen(openExercise: (Long) -> Unit) {
@@ -116,7 +116,7 @@ fun ExerciseDetailScreen(exerciseId: Long, openExercise: (Long) -> Unit, back: (
         ) {
             Text("${ex.muscleGroup} · ${ex.equipment}", style = MaterialTheme.typography.bodyLarge)
 
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+            RetroCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                 Column(Modifier.fillMaxWidth().padding(16.dp)) {
                     Text("Your coach target", style = MaterialTheme.typography.labelLarge)
                     Text(formatTarget(target.sets, target.reps, target.weightKg, ex.isCardio, ex.isTimed), style = MaterialTheme.typography.headlineSmall)

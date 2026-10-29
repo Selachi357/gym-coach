@@ -20,13 +20,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.SentimentDissatisfied
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -60,6 +57,9 @@ import com.gymcoach.ui.describeSet
 import com.gymcoach.ui.formatTarget
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import com.gymcoach.ui.theme.RetroButton
+import com.gymcoach.ui.theme.RetroCard
+import com.gymcoach.ui.theme.RetroOutlinedButton
 
 @Composable
 fun WorkoutScreen(
@@ -160,7 +160,7 @@ fun WorkoutScreen(
                 )
             }
             item {
-                Button(onClick = addExercise, modifier = Modifier.fillMaxWidth()) {
+                RetroButton(onClick = addExercise, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Filled.Add, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text("Add exercise")
@@ -232,7 +232,7 @@ private fun ExerciseCard(
     val distance = if (distanceText.isBlank()) 0.0 else distanceText.replace(',', '.').toDoubleOrNull()
     val reps = repsText.toIntOrNull()
 
-    Card {
+    RetroCard {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -310,12 +310,12 @@ private fun ExerciseCard(
             Text("How hard was it? $effortInt/10 · ${effortLabel(effortInt)}", style = MaterialTheme.typography.bodyMedium)
             Slider(value = effort, onValueChange = { effort = it }, valueRange = 1f..10f, steps = 8)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
+                RetroButton(
                     onClick = { if (weight != null && reps != null && distance != null) onLog(weight, reps, effortInt, distance) },
                     enabled = weight != null && distance != null && reps != null && reps > 0,
                     modifier = Modifier.weight(1f),
                 ) { Text(if (cardio) "Log" else "Log set") }
-                OutlinedButton(onClick = onTooHard, modifier = Modifier.weight(1f)) {
+                RetroOutlinedButton(onClick = onTooHard, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Filled.SentimentDissatisfied, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Too hard")
