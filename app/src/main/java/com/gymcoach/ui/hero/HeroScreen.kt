@@ -35,6 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymcoach.game.Badge
+import com.gymcoach.game.Bonfire
+import com.gymcoach.game.BonfireMilestone
+import com.gymcoach.game.Contract
+import com.gymcoach.game.Contracts
 import com.gymcoach.game.Boss
 import com.gymcoach.game.BossFight
 import com.gymcoach.game.BossStatus
@@ -50,6 +54,9 @@ import com.gymcoach.game.QuestState
 import com.gymcoach.game.Rank
 import com.gymcoach.ui.GymTopBar
 import com.gymcoach.ui.LocalRepository
+import com.gymcoach.data.GameState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import com.gymcoach.ui.theme.RetroButton
 import com.gymcoach.ui.theme.RetroOutlinedButton
 import androidx.compose.ui.platform.LocalContext
@@ -109,6 +116,16 @@ fun HeroBanner(onClick: () -> Unit) {
                     Spacer(Modifier.width(6.dp))
                     PixelText("${h.weekStreak} WK STREAK · ${h.thisWeek}/${h.weeklyTarget}", 8.sp, Retro.ember)
                 }
+                game?.bonfire?.let { b ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        BonfireSprite(b.tier, 16.dp)
+                        Spacer(Modifier.width(6.dp))
+                        PixelText(
+                            if (b.embers) "EMBERS! TRAIN TODAY" else "${b.days} DAY BONFIRE",
+                            8.sp, if (b.embers) Retro.hp else Retro.ember,
+                        )
+                    }
+                }
                 if (fight != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         BossSprite(fight.boss, 16.dp)
@@ -128,6 +145,7 @@ fun HeroScreen(openDefender: () -> Unit, openCity: () -> Unit) {
     val repo = LocalRepository.current
     val game by repo.game.collectAsStateWithLifecycle(initialValue = null)
     val city by repo.city.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableStateOf(RealmTab.HERO) }
     Column(Modifier.fillMaxSize().background(Retro.deep)) {
         GymTopBar("Hero")
@@ -139,7 +157,7 @@ fun HeroScreen(openDefender: () -> Unit, openCity: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             when (tab) {
-                RealmTab.HERO -> heroItems(g.hero)
+                RealmTab.HERO -> heroItems(g, onContract = { c -> scope.launch { repo.chooseContract(c) } })
                 RealmTab.BOSS -> campaignItems(g.realm.campaign)
                 RealmTab.VOYAGE -> voyageItems(g.realm.voyage)
                 RealmTab.VILLAGE -> villageItems(city, g.training, openCity, openDefender)
@@ -172,8 +190,11 @@ private fun PixelTabs(selected: RealmTab, onSelect: (RealmTab) -> Unit) {
     }
 }
 
-private fun LazyListScope.heroItems(h: HeroStats) {
+private fun LazyListScope.heroItems(g: GameState, onContract: (Contract) -> Unit) {
+    val h = g.hero
     item { CharacterSheet(h) }
+    item { BonfirePanel(g.bonfire) }
+    item { ContractPanel(g.contracts, g.weeklyTarget, onContract) }
     item { StreakPanel(h) }
     item { StatsPanel(h) }
     item { PixelText("QUESTS", 12.sp, Retro.gold) }
@@ -399,6 +420,92 @@ private fun LazyListScope.villageItems(city: CityState, training: TrainingTotals
                 "mage towers power Castle Defender.",
             7.sp, Retro.dim,
         )
+    }
+}
+
+@Composable
+private fun BonfirePanel(b: Bonfire) {
+    RetroPanel {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                BonfireSprite(b.tier, 72.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    PixelText("${b.days} DAY BONFIRE", 11.sp, Retro.ember)
+                    PixelText("BEST ${b.best} DAYS", 8.sp, Retro.dim)
+                    val status = when {
+                        b.embers -> "EMBERS! TRAIN TODAY FOR A SECOND WIND."
+                        b.restToday -> "REST DAY. RECOVERY IS PART OF THE QUEST."
+                        b.litToday -> "TODAY IS LIT."
+                        else -> "TRAIN TODAY TO FEED THE FIRE."
+                    }
+                    PixelText(status, 7.sp, if (b.embers) Retro.hp else Retro.parchment)
+                }
+            }
+            b.next?.let { next ->
+                PixelBar(b.days.toFloat() / next.days, Retro.ember, segments = 16)
+                PixelText(
+                    "NEXT: ${next.title.uppercase()} AT ${next.days} DAYS · +${next.xp} XP" +
+                        if (next.tokens > 0) " · ${next.tokens} TOKEN${if (next.tokens > 1) "S" else ""}" else "",
+                    7.sp, Retro.dim,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                BonfireMilestone.entries.forEach { m ->
+                    val reached = m in b.milestones
+                    Box(
+                        Modifier.weight(1f).background(if (reached) Retro.ember else Retro.panel).padding(vertical = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) { PixelText("${m.days}", 7.sp, if (reached) Retro.night else Retro.dim) }
+                }
+            }
+            PixelText(
+                "Workouts and planned rest days both feed the fire. Without a calendar plan, two rest days after a " +
+                    "workout are fine. Miss a day and you get a Second Wind: train the next day and your streak survives " +
+                    "(once a week). " + if (b.secondWindReady) "Second Wind is ready." else "Second Wind is recharging.",
+                7.sp, Retro.dim,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ContractPanel(c: Contracts, weeklyTarget: Int, onContract: (Contract) -> Unit) {
+    val now = c.thisWeek
+    RetroPanel {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PixelBadge(Badge.SCROLL, unlocked = now.done, size = 32.dp)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    PixelText("GUILD CONTRACT", 7.sp, Retro.dim)
+                    PixelText(now.contract.title.uppercase(), 10.sp, Retro.gold)
+                    PixelText(now.contract.description(weeklyTarget), 7.sp)
+                }
+                PixelText(if (now.done) "DONE" else "${now.current}/${now.goal}", 9.sp, if (now.done) Retro.xp else Retro.parchment)
+            }
+            PixelBar(now.current.toFloat() / now.goal, Retro.gold, segments = 16)
+            if (!now.done) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Contract.entries.forEach { option ->
+                        val on = option == now.contract
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .background(if (on) Retro.gold else Retro.panel)
+                                .border(2.dp, if (on) Retro.parchment else Retro.dim)
+                                .clickable { onContract(option) }
+                                .padding(vertical = 8.dp, horizontal = 4.dp),
+                            contentAlignment = Alignment.Center,
+                        ) { PixelText(option.title.uppercase(), 6.sp, if (on) Retro.night else Retro.parchment) }
+                    }
+                }
+            }
+            PixelText(
+                "One contract a week, Monday to Sunday: +250 XP and 50 gold for your village. ${c.completed} fulfilled so far.",
+                7.sp, Retro.dim,
+            )
+        }
     }
 }
 

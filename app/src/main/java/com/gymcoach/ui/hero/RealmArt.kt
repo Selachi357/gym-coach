@@ -4,17 +4,23 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import com.gymcoach.game.Boss
 import com.gymcoach.game.Island
 import com.gymcoach.game.Voyage
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 /** A full-width pixel picture that keeps its aspect ratio. */
 @Composable
@@ -301,4 +307,61 @@ val mapPalette = mapOf(
 fun VoyageMap(voyage: Voyage, modifier: Modifier = Modifier) {
     val rows = remember(voyage) { voyageMap(voyage) }
     PixelPicture(rows, mapPalette, modifier)
+}
+
+/** A 16 × 16 campfire. The flames grow with [tier] (0 is cold ash); [frame] makes them flicker. */
+fun bonfireRows(tier: Int, frame: Int): List<String> {
+    val g = Array(16) { CharArray(16) { '.' } }
+    fun set(x: Int, y: Int, c: Char) {
+        if (x in 0..15 && y in 0..15) g[y][x] = c
+    }
+    // Crossed logs.
+    for (x in 3..12) set(x, 13, if (x % 3 == 0) 'p' else 'b')
+    for (x in listOf(4, 5, 10, 11)) set(x, 12, 'p')
+    for (x in 2..13) set(x, 14, 'R')
+    if (tier == 0) {
+        set(7, 11, 'R'); set(8, 12, 'R'); set(6, 12, 'R')
+    } else {
+        val height = minOf(12, 3 + 2 * tier)
+        val base = 12
+        for (dy in 0 until height) {
+            val y = base - dy
+            val half = ((height - dy) * 4 / height).coerceAtLeast(0)
+            val sway = if ((dy + frame) % 3 == 0 && dy > height / 2) (if (frame % 2 == 0) 1 else -1) else 0
+            for (x in 8 - half - 1..8 + half) {
+                val inner = abs(x - 7.5f + sway) < half - 1
+                val core = abs(x - 7.5f + sway) < half - 2 && dy < height / 2
+                set(x + sway, y, if (core && tier >= 3) 'x' else if (inner) 'n' else if (dy > height - 3) 'o' else 'e')
+            }
+        }
+        // Sparks.
+        if (tier >= 2) {
+            set(4 + frame % 3, base - height - 1, 'n')
+            set(11 - frame % 2, base - height + 1, 'e')
+        }
+    }
+    return g.map { String(it) }
+}
+
+val bonfirePalette = mapOf(
+    'b' to Color(0xFF6B4423),
+    'p' to Color(0xFF8B5A2B),
+    'R' to Color(0xFF5A5E70),
+    'e' to Retro.ember,
+    'o' to Color(0xFFB03030),
+    'n' to Color(0xFFFFD84A),
+    'x' to Color(0xFFFFF6D0),
+)
+
+/** An animated campfire. */
+@Composable
+fun BonfireSprite(tier: Int, size: Dp, modifier: Modifier = Modifier) {
+    var frame by remember { mutableIntStateOf(0) }
+    LaunchedEffect(tier) {
+        while (true) {
+            delay(220)
+            frame = (frame + 1) % 6
+        }
+    }
+    PixelSprite(bonfireRows(tier, frame), bonfirePalette, size, modifier)
 }

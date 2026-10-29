@@ -10,9 +10,17 @@ data class Res(val gold: Int = 0, val wood: Int = 0, val stone: Int = 0, val foo
 }
 
 /** Totals from the workout log that pay for the city. */
-data class TrainingTotals(val workouts: Int, val planWorkouts: Int, val strengthSets: Int, val cardioMinutes: Int) {
+data class TrainingTotals(
+    val workouts: Int,
+    val planWorkouts: Int,
+    val strengthSets: Int,
+    val cardioMinutes: Int,
+    /** Weekly contracts fulfilled, 50 gold each. */
+    val contracts: Int = 0,
+) {
     companion object {
-        fun of(workouts: List<WorkoutRecord>) = TrainingTotals(
+        fun of(workouts: List<WorkoutRecord>, contracts: Int = 0) = TrainingTotals(
+            contracts = contracts,
             workouts = workouts.size,
             planWorkouts = workouts.count { it.inProgram },
             strengthSets = workouts.sumOf { w -> w.sets.count { !it.cardio } },
@@ -151,7 +159,7 @@ object City {
     }
 
     fun trainingIncome(t: TrainingTotals) = Res(
-        gold = 15 * t.workouts + 5 * t.planWorkouts,
+        gold = 15 * t.workouts + 5 * t.planWorkouts + BonfireCalculator.CONTRACT_GOLD * t.contracts,
         wood = t.cardioMinutes / 3,
         stone = 2 * t.strengthSets,
         food = 5 * t.workouts,

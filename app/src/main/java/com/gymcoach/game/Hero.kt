@@ -115,7 +115,8 @@ object HeroCalculator {
 
     private fun weekStart(date: LocalDate) = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 
-    fun compute(workouts: List<WorkoutRecord>, today: LocalDate, weeklyTarget: Int = 3): HeroStats {
+    /** [bonusXp] comes from outside the log, e.g. bonfire milestones and weekly contracts. */
+    fun compute(workouts: List<WorkoutRecord>, today: LocalDate, weeklyTarget: Int = 3, bonusXp: Int = 0): HeroStats {
         val sorted = workouts.sortedBy { it.date }
         var xp = 0
         var prs = 0
@@ -196,6 +197,7 @@ object HeroCalculator {
             QuestState(q, minOf(current, goal), goal)
         }
         xp += quests.count { it.done } * XP_QUEST
+        xp += bonusXp
 
         val (level, into, next) = levelFor(xp)
         return HeroStats(

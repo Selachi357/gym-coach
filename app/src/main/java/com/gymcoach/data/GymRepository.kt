@@ -11,7 +11,11 @@ import com.gymcoach.coach.ProgramFocus
 import com.gymcoach.coach.ProgramPlanner
 import com.gymcoach.coach.formatKg
 import com.gymcoach.game.HeroCalculator
+import com.gymcoach.game.Bonfire
+import com.gymcoach.game.BonfireCalculator
 import com.gymcoach.game.City
+import com.gymcoach.game.Contract
+import com.gymcoach.game.Contracts
 import com.gymcoach.game.CityState
 import com.gymcoach.game.HeroStats
 import com.gymcoach.game.Res
@@ -38,10 +42,31 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-class GymRepository(private val db: GymDatabase, private val cityFile: File) {
+class GymRepository(private val db: GymDatabase, saveDir: File) {
     private val dao = db.dao()
 
-    // The village is the only game state the player chooses, so it is saved to its own small file.
+    // The village and weekly contracts are the only game state the player chooses, so they are saved
+    // to their own small files and the workout database stays as it is.
+    private val cityFile = File(saveDir, "city.txt")
+    private val contractsFile = File(saveDir, "contracts.txt")
+
+    private val contractChoices = MutableStateFlow(
+        runCatching {
+            contractsFile.readLines().mapNotNull { line ->
+                val p = line.trim().split(' ')
+                runCatching { LocalDate.parse(p[0]) to Contract.valueOf(p[1]) }.getOrNull()
+            }.toMap()
+        }.getOrDefault(emptyMap()),
+    )
+
+    /** Picks this week's contract. */
+    suspend fun chooseContract(contract: Contract) {
+        val monday = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val next = contractChoices.value + (monday to contract)
+        withContext(Dispatchers.IO) { contractsFile.writeText(next.entries.joinToString("\n") { "${it.key} ${it.value.name}" }) }
+        contractChoices.value = next
+    }
+
     private val cityState = MutableStateFlow(runCatching { City.decode(cityFile.readText()) }.getOrDefault(CityState()))
     val city: StateFlow<CityState> = cityState
 
@@ -73,25 +98,34 @@ class GymRepository(private val db: GymDatabase, private val cityFile: File) {
     fun sessionPlans(sessionId: Long): Flow<List<SessionExercise>> = dao.sessionPlans(sessionId)
     val activeProgram: Flow<Program?> = dao.activeProgram()
 
-    /** XP, level, rank, streak and quests, plus the campaign, voyage and village income, recomputed whenever the log changes. */
+    private data class GameInputs(
+        val sessions: List<WorkoutSession>,
+        val sets: List<SetEntry>,
+        val exercises: List<Exercise>,
+        val goals: List<Goal>,
+        val program: Program?,
+    )
+
+    /**
+     * XP, level, rank, streaks, bonfire, contracts and quests, plus the campaign, voyage and village income,
+     * recomputed whenever the log changes.
+     */
     val game: Flow<GameState> = combine(
-        dao.finishedSessions(), dao.finishedSets(), dao.exercises(), dao.goals(), dao.activeProgram(),
-    ) { sessions, sets, exercises, goals, program ->
-        buildGame(sessions, sets, exercises, goals, program)
-    }
+        combine(dao.finishedSessions(), dao.finishedSets(), dao.exercises(), dao.goals(), dao.activeProgram()) { a, b, c, d, e ->
+            GameInputs(a, b, c, d, e)
+        },
+        contractChoices,
+    ) { inputs, choices -> buildGame(inputs, choices) }
 
     val hero: Flow<HeroStats> = game.map { it.hero }
 
-    suspend fun gameNow(): GameState =
-        buildGame(dao.getFinishedSessions(), dao.getFinishedSets(), dao.allExercises(), dao.allGoals(), dao.getActiveProgram())
+    suspend fun gameNow(): GameState = buildGame(
+        GameInputs(dao.getFinishedSessions(), dao.getFinishedSets(), dao.allExercises(), dao.allGoals(), dao.getActiveProgram()),
+        contractChoices.value,
+    )
 
-    private fun buildGame(
-        sessions: List<WorkoutSession>,
-        sets: List<SetEntry>,
-        exercises: List<Exercise>,
-        goals: List<Goal>,
-        program: Program?,
-    ): GameState {
+    private fun buildGame(inputs: GameInputs, choices: Map<LocalDate, Contract>): GameState {
+        val (sessions, sets, exercises, goals, program) = inputs
         val cardio = exercises.filter { it.isCardio }.map { it.id }.toSet()
         val setsBySession = sets.groupBy { it.sessionId }
         val zone = ZoneId.systemDefault()
@@ -107,15 +141,37 @@ class GymRepository(private val db: GymDatabase, private val cityFile: File) {
         val weeklyTarget = goals.firstOrNull { it.type == GoalType.WEEKLY_SESSIONS && it.achievedAt == null }
             ?.target?.toInt()?.coerceAtLeast(1) ?: 3
         val today = LocalDate.now()
-        val hero = HeroCalculator.compute(records, today, weeklyTarget)
+        val programStart = program?.let { Instant.ofEpochMilli(it.startedAt).atZone(zone).toLocalDate() }
+
+        // A calendar plan says which days are for training and which for rest.
+        val planDays = mutableSetOf<LocalDate>()
+        val restDays = mutableSetOf<LocalDate>()
+        if (program != null && programStart != null && ProgramPlanner.isCalendarBased(program.focusEnum())) {
+            for (i in 0 until ProgramPlanner.WEEKS * 7) {
+                val date = programStart.plusDays(i.toLong())
+                if (ProgramPlanner.onboardDay(i / 7 + 1, i % 7 + 1) == null) restDays += date else planDays += date
+            }
+        }
+        val bonfire = BonfireCalculator.compute(records.map { it.date }, restDays, planDays, today)
+        val contracts = BonfireCalculator.contracts(records, choices, weeklyTarget, today)
+
+        val hero = HeroCalculator.compute(records, today, weeklyTarget, BonfireCalculator.bonusXp(bonfire, contracts))
         // The campaign follows the plan's weeks; without a plan it starts on the Monday of your first workout.
         val realm = RealmCalculator.compute(
             records,
             today,
-            campaignStart = program?.let { Instant.ofEpochMilli(it.startedAt).atZone(zone).toLocalDate() },
+            campaignStart = programStart,
             sessionsPerWeek = program?.let { ProgramPlanner.workoutsPerWeek(it.focusEnum(), it.daysPerWeek) } ?: weeklyTarget,
         )
-        return GameState(hero, realm, trainedToday = records.any { it.date == today }, training = TrainingTotals.of(records))
+        return GameState(
+            hero = hero,
+            realm = realm,
+            trainedToday = records.any { it.date == today },
+            training = TrainingTotals.of(records, contracts.completed),
+            bonfire = bonfire,
+            contracts = contracts,
+            weeklyTarget = weeklyTarget,
+        )
     }
     fun finishedProgramSessions(programId: Long): Flow<List<WorkoutSession>> = dao.finishedProgramSessions(programId)
 
@@ -256,6 +312,7 @@ class GymRepository(private val db: GymDatabase, private val cityFile: File) {
         val village = cityState.value
         val earned = City.treasury(village, gameAfter.training) - City.treasury(village, gameBefore.training)
         val celebration = HeroCalculator.celebrate(gameBefore.hero, gameAfter.hero) +
+            BonfireCalculator.celebrate(gameBefore.bonfire, gameAfter.bonfire, gameBefore.contracts, gameAfter.contracts) +
             RealmCalculator.celebrate(gameBefore.realm, gameAfter.realm) +
             listOfNotNull(
                 "Village: +${earned.gold} gold, +${earned.wood} wood, +${earned.stone} stone, +${earned.food} food."
@@ -483,4 +540,12 @@ fun ExerciseTarget.withPlan(plan: SessionExercise) = copy(
     sets = plan.plannedSets ?: sets,
 )
 
-data class GameState(val hero: HeroStats, val realm: Realm, val trainedToday: Boolean, val training: TrainingTotals)
+data class GameState(
+    val hero: HeroStats,
+    val realm: Realm,
+    val trainedToday: Boolean,
+    val training: TrainingTotals,
+    val bonfire: Bonfire,
+    val contracts: Contracts,
+    val weeklyTarget: Int,
+)
