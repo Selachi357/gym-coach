@@ -465,8 +465,7 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
      * the coach's pick from the beginner plan for this weekday.
      */
     fun todayPlan(program: Program?, finished: List<WorkoutSession>, today: LocalDate = LocalDate.now()): TodayPlan {
-        val status = program?.let { programStatus(it, finished, today) }
-        when (status) {
+        if (program != null) when (val status = programStatus(program, finished, today)) {
             is ProgramStatus.Next -> return TodayPlan(status.plan, program.focusEnum(), fromProgram = true, rest = null)
             is ProgramStatus.DoneToday -> return TodayPlan(status.plan, program.focusEnum(), fromProgram = true, rest = null)
             is ProgramStatus.Rest -> return TodayPlan(null, program.focusEnum(), fromProgram = true, rest = status.note)
