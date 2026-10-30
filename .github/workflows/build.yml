@@ -20,7 +20,14 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace
+        # Compiler errors and failed tests are also shown as annotations on the run.
+        run: |
+          set -o pipefail
+          ./gradlew testDebugUnitTest --stacktrace 2>&1 | tee build.log || {
+            grep -E "^e: " build.log | head -20 | sed 's/^/::error::/'
+            grep -E "FAILED|AssertionError|expected:" build.log | head -20 | sed 's/^/::error::/'
+            exit 1
+          }
       - name: Build APK
         run: ./gradlew assembleRelease --stacktrace
       - name: Rename APK
