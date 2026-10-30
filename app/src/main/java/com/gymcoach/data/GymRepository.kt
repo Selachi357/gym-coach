@@ -222,7 +222,7 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
         if (program != null && programStart != null && ProgramPlanner.isCalendarBased(program.focusEnum())) {
             for (i in 0 until ProgramPlanner.WEEKS * 7) {
                 val date = programStart.plusDays(i.toLong())
-                if (ProgramPlanner.onboardDay(i / 7 + 1, i % 7 + 1) == null) restDays += date else planDays += date
+                if (ProgramPlanner.calendarDay(program.focusEnum(), i / 7 + 1, i % 7 + 1) == null) restDays += date else planDays += date
             }
         }
         val bonfire = BonfireCalculator.compute(records.map { it.date }, restDays, planDays, today, city.charms)
@@ -421,7 +421,10 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
         val start = if (ProgramPlanner.isCalendarBased(focus)) startDate.toEpochMillis() else System.currentTimeMillis()
         val days = ProgramPlanner.workoutsPerWeek(focus, daysPerWeek)
         dao.insertProgram(Program(startedAt = start, daysPerWeek = days, focus = focus.name, active = true))
-        val message = if (focus == ProgramFocus.ONBOARD) {
+        val message = if (focus == ProgramFocus.BEGINNER) {
+            "Your beginner plan starts ${startDate.format(DateTimeFormatter.ofPattern("EEE d MMM"))}: 3 strength days and 3 cardio days, " +
+                "Sunday off. Start light, never train to failure, and add weight when you hit the top of the range on every set."
+        } else if (focus == ProgramFocus.ONBOARD) {
             "Your onboard plan starts ${startDate.format(DateTimeFormatter.ofPattern("d MMM"))}: 3 strength and 2 cardio sessions " +
                 "every 7 days. Weeks 1–2 Learn, 3–4 Build, 5–6 Push. Missing a session costs nothing; training exhausted does."
         } else {
@@ -452,9 +455,76 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
         val week = (index / 7).toInt() + 1
         val day = (index % 7).toInt() + 1
         if (week > ProgramPlanner.WEEKS) return ProgramStatus.Finished
-        val plan = ProgramPlanner.onboardDay(week, day)
-            ?: return ProgramStatus.Rest(week, day, ProgramPlanner.onboardRestNote(day))
+        val plan = ProgramPlanner.calendarDay(focus, week, day)
+            ?: return ProgramStatus.Rest(week, day, ProgramPlanner.restNote(focus, day))
         return if ((week to day) in done) ProgramStatus.DoneToday(plan) else ProgramStatus.Next(plan)
+    }
+
+    /**
+     * What the coach has lined up for today: the program's day when a program runs today, otherwise
+     * the coach's pick from the beginner plan for this weekday.
+     */
+    fun todayPlan(program: Program?, finished: List<WorkoutSession>, today: LocalDate = LocalDate.now()): TodayPlan {
+        val status = program?.let { programStatus(it, finished, today) }
+        when (status) {
+            is ProgramStatus.Next -> return TodayPlan(status.plan, program.focusEnum(), fromProgram = true, rest = null)
+            is ProgramStatus.DoneToday -> return TodayPlan(status.plan, program.focusEnum(), fromProgram = true, rest = null)
+            is ProgramStatus.Rest -> return TodayPlan(null, program.focusEnum(), fromProgram = true, rest = status.note)
+            else -> Unit
+        }
+        val weekday = today.dayOfWeek.value
+        val day = ProgramPlanner.beginnerDay(1, weekday)
+        return TodayPlan(day, ProgramFocus.BEGINNER, fromProgram = false, rest = if (day == null) ProgramPlanner.restNote(ProgramFocus.BEGINNER, weekday) else null)
+    }
+
+    /** Names of the exercises with a set logged today. */
+    fun loggedToday(): Flow<Set<String>> = dao.exercisesLoggedSince(startOfDay()).map { it.toSet() }
+
+    /** Today's open workout, or null when there is none yet. */
+    private suspend fun todaySession(): WorkoutSession? =
+        dao.getActiveSession()?.takeIf { it.startedAt >= startOfDay() }
+
+    /**
+     * The coach logs one exercise of today's plan for you: every planned set at the planned weight and reps,
+     * rated a solid 7/10. Starts today's workout first when there is none.
+     */
+    suspend fun logPlanned(plan: TodayPlan, exerciseName: String) {
+        val day = plan.day ?: return
+        val ex = dao.getExerciseByName(exerciseName) ?: return
+        val sessionId = todaySession()?.id ?: startToday(plan) ?: return
+        if (dao.getSessionExercise(sessionId, ex.id) == null) addExerciseToSession(sessionId, ex.id)
+        val target = currentTarget(sessionId, ex.id)
+        val week = dao.getSession(sessionId)?.programWeek ?: day.week
+        val planned = if (dao.getSessionExercise(sessionId, ex.id)?.plannedSets != null) target.toPrescription() else {
+            ProgramPlanner.planned(plan.focus, week, ex.isBodyweight, ex.isCardio, target.toPrescription(), ex.name, ex.weightStepKg, day.day)
+        }
+        repeat(if (ex.isCardio) 1 else planned.sets) {
+            logSet(sessionId, ex.id, if (ex.isCardio) 0.0 else planned.weightKg, planned.reps, effort = 7)
+        }
+    }
+
+    /** Takes back the sets of one exercise logged in today's open workout. Returns false when the workout is already finished. */
+    suspend fun unlogToday(exerciseName: String): Boolean {
+        val session = todaySession() ?: return false
+        val ex = dao.getExerciseByName(exerciseName) ?: return false
+        dao.getSetsForSession(session.id).filter { it.exerciseId == ex.id }.forEach { dao.deleteSet(it) }
+        return true
+    }
+
+    /** Starts today's workout with all of today's exercises and targets. Returns the session id. */
+    suspend fun startToday(plan: TodayPlan): Long? {
+        todaySession()?.let { return it.id }
+        val day = plan.day ?: return null
+        if (plan.fromProgram) return startProgramDay()
+        val sessionId = startSession()
+        day.exercises.forEachIndexed { i, name ->
+            val ex = dao.getExerciseByName(name) ?: return@forEachIndexed
+            val p = ProgramPlanner.planned(
+                plan.focus, day.week, ex.isBodyweight, ex.isCardio, targetFor(ex.id).toPrescription(), ex.name, ex.weightStepKg, day.day,
+            )
+            dao.insertSessionExercise(SessionExercise(sessionId, ex.id, i, p.sets, p.reps, p.weightKg))
+        }
+        return sessionId
     }
 
     suspend fun currentProgramStatus(): ProgramStatus? {
@@ -493,6 +563,7 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
             val ex = dao.getExercise(se.exerciseId) ?: return@forEach
             val planned = ProgramPlanner.planned(
                 focus, week, ex.isBodyweight, ex.isCardio, targetFor(ex.id).toPrescription(), ex.name, ex.weightStepKg,
+                session.programDay ?: 0,
             )
             dao.updateSessionExercise(
                 se.copy(plannedSets = planned.sets, plannedReps = planned.reps, plannedWeightKg = planned.weightKg)
@@ -587,6 +658,8 @@ class GymRepository(private val db: GymDatabase, saveDir: File) {
     }
 
     companion object {
+        fun startOfDay(): Long = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
         fun startOfWeek(): Long = LocalDate.now()
             .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
             .atStartOfDay(ZoneId.systemDefault())
@@ -608,6 +681,15 @@ fun Program.focusEnum(): ProgramFocus =
     ProgramFocus.entries.firstOrNull { it.name == focus } ?: ProgramFocus.MUSCLE
 
 private fun LocalDate.toEpochMillis(): Long = atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+/** Today's workout: [day] is null on a rest day, with [rest] saying what to do instead. */
+data class TodayPlan(
+    val day: ProgramDayPlan?,
+    val focus: ProgramFocus,
+    /** False when the coach picked the day because no program runs today. */
+    val fromProgram: Boolean,
+    val rest: String?,
+)
 
 sealed interface ProgramStatus {
     /** Onboard plan before its start date. */

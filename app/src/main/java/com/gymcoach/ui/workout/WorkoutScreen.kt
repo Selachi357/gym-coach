@@ -87,7 +87,8 @@ fun WorkoutScreen(
         }
     }
     val focus = program?.focusEnum()
-    val onboard = focus == ProgramFocus.ONBOARD && dayPlan != null
+    // The calendar plans (onboard and beginner) have rep ranges and a set warm-up.
+    val onboard = focus != null && ProgramPlanner.isCalendarBased(focus) && dayPlan != null
 
     var coachMessages by remember { mutableStateOf<List<String>?>(null) }
     var closeAfterMessages by remember { mutableStateOf(false) }
@@ -128,8 +129,8 @@ fun WorkoutScreen(
                         dayPlan.note?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                         if (onboard && isStrength) {
                             Text(
-                                "Warm-up first (8 min): ${Guide.WARM_UP.joinToString(" ")} " +
-                                    "Rest 90 s between sets of big lifts, 60 s for the rest.",
+                                ProgramPlanner.warmUp(focus!!) ?: ("Warm-up first (8 min): ${Guide.WARM_UP.joinToString(" ")} " +
+                                    "Rest 90 s between sets of big lifts, 60 s for the rest."),
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
@@ -148,7 +149,7 @@ fun WorkoutScreen(
             items(exercises, key = { it.id }) { exercise ->
                 ExerciseCard(
                     exercise = exercise,
-                    repRange = if (onboard) ProgramPlanner.onboardRepRange[exercise.name] else null,
+                    repRange = if (onboard) ProgramPlanner.repRange(focus!!, exercise.name) else null,
                     target = (targetMap[exercise.id] ?: repo.defaultTarget(exercise)).let { base ->
                         planMap[exercise.id]?.let { base.withPlan(it) } ?: base
                     },

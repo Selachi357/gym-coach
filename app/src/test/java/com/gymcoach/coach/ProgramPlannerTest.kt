@@ -18,7 +18,7 @@ class ProgramPlannerTest {
     @Test
     fun deloadWeekIsLighter() {
         val base = Prescription(weightKg = 100.0, reps = 8, sets = 3)
-        for (focus in ProgramFocus.entries - ProgramFocus.ONBOARD) {
+        for (focus in ProgramFocus.entries.filter { !ProgramPlanner.isCalendarBased(it) }) {
             val peak = ProgramPlanner.planned(focus, 5, isBodyweight = false, isCardio = false, base = base)
             val deload = ProgramPlanner.planned(focus, 6, isBodyweight = false, isCardio = false, base = base)
             assertTrue(deload.weightKg < peak.weightKg)
@@ -64,5 +64,38 @@ class ProgramPlannerTest {
         val cross = ProgramPlanner.planned(ProgramFocus.ONBOARD, 5, true, true, Prescription(0.0, 25, 1), "Crosstrainer")
         assertEquals(40, cross.reps)
         assertTrue(!ProgramPlanner.isDeload(ProgramFocus.ONBOARD, 6))
+    }
+
+    @Test
+    fun beginnerPlanFollowsThePdfWeek() {
+        val plan = ProgramPlanner.plan(6, ProgramFocus.BEGINNER)
+        assertEquals(6 * 6, plan.size)
+        assertEquals(null, ProgramPlanner.beginnerDay(1, 7))
+        assertEquals("Goblet Squat", ProgramPlanner.beginnerDay(1, 1)!!.exercises.first())
+        assertTrue(ProgramPlanner.beginnerDay(1, 3)!!.exercises.contains("Leg Press"))
+        assertTrue(ProgramPlanner.beginnerDay(1, 5)!!.exercises.contains("Farmer's Carry"))
+        assertEquals(6, ProgramPlanner.workoutsPerWeek(ProgramFocus.BEGINNER, 3))
+        assertTrue(ProgramPlanner.isCalendarBased(ProgramFocus.BEGINNER))
+        assertTrue(!ProgramPlanner.isDeload(ProgramFocus.BEGINNER, 6))
+    }
+
+    @Test
+    fun beginnerSetsRepsAndCardioByWeek() {
+        val base = Prescription(16.0, 8, 3)
+        assertEquals(2, ProgramPlanner.planned(ProgramFocus.BEGINNER, 1, false, false, base, "Goblet Squat").sets)
+        assertEquals(10, ProgramPlanner.planned(ProgramFocus.BEGINNER, 1, false, false, base, "Goblet Squat").reps)
+        assertEquals(16.0, ProgramPlanner.planned(ProgramFocus.BEGINNER, 1, false, false, base, "Goblet Squat").weightKg, 0.0)
+        assertEquals(4, ProgramPlanner.planned(ProgramFocus.BEGINNER, 5, false, false, base, "Goblet Squat").sets)
+        assertEquals(3, ProgramPlanner.planned(ProgramFocus.BEGINNER, 5, false, false, base, "Plank").sets)
+        val cardio = Prescription(0.0, 20, 1)
+        assertEquals(30, ProgramPlanner.planned(ProgramFocus.BEGINNER, 1, false, true, cardio, "Crosstrainer", day = 2).reps)
+        assertEquals(50, ProgramPlanner.planned(ProgramFocus.BEGINNER, 5, false, true, cardio, "Crosstrainer", day = 2).reps)
+        assertEquals(10, ProgramPlanner.planned(ProgramFocus.BEGINNER, 1, false, true, cardio, "Rowing Machine", day = 1).reps)
+        assertEquals(10, ProgramPlanner.planned(ProgramFocus.BEGINNER, 1, false, true, cardio, "Rowing Machine", day = 6).reps)
+        assertEquals(20, ProgramPlanner.planned(ProgramFocus.BEGINNER, 2, false, true, cardio, "Rowing Machine", day = 6).reps)
+        assertEquals("8–10", ProgramPlanner.repRange(ProgramFocus.BEGINNER, "Goblet Squat"))
+        // The interval notes work with the timer.
+        assertEquals(Intervals(5, 60, 60), Intervals.parse(ProgramPlanner.beginnerDay(1, 1)!!.note!!))
+        assertEquals(Intervals(6, 30, 90), Intervals.parse(ProgramPlanner.beginnerDay(1, 5)!!.note!!))
     }
 }

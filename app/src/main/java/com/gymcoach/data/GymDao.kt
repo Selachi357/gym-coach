@@ -62,6 +62,15 @@ interface GymDao {
     @Query("SELECT * FROM sessions WHERE id = :id")
     suspend fun getSession(id: Long): WorkoutSession?
 
+    @Query("SELECT * FROM sessions WHERE endedAt IS NULL ORDER BY startedAt DESC LIMIT 1")
+    suspend fun getActiveSession(): WorkoutSession?
+
+    @Query(
+        "SELECT DISTINCT e.name FROM sets st JOIN sessions s ON s.id = st.sessionId " +
+            "JOIN exercises e ON e.id = st.exerciseId WHERE s.startedAt >= :since"
+    )
+    fun exercisesLoggedSince(since: Long): Flow<List<String>>
+
     @Query(
         """
         SELECT s.id, s.startedAt, s.endedAt,

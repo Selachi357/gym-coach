@@ -8,6 +8,10 @@ enum class ProgramFocus(val label: String, val description: String) {
         "Onboard plan",
         "Your 6-week plan: 3 strength and 2 cardio sessions every 7 days, built around watch schedules on a moving ship.",
     ),
+    BEGINNER(
+        "Beginner 6-day plan",
+        "Your 6-week beginner plan: 3 full-body strength days and 3 rowing and crosstrainer days, Sunday off.",
+    ),
     STRENGTH("Strength", "Heavier weights, fewer reps. Get stronger on the big lifts."),
     MUSCLE("Muscle", "Moderate weights, 8 to 12 reps. Build size and shape."),
     FITNESS("Fitness", "Lighter weights, more reps and cardio. Feel fitter overall."),
@@ -159,15 +163,128 @@ object ProgramPlanner {
         }
     }
 
+    // Beginner 6-day plan: day 1 is Monday, day 7 (Sunday) is rest.
+
+    private val beginnerStrengthA = listOf(
+        "Goblet Squat", "Dumbbell Bench Press", "One-Arm Dumbbell Row", "Dumbbell Romanian Deadlift", "Plank", "Rowing Machine",
+    )
+    // No cable machine on board: the dumbbell pullover stands in for the lat pulldown.
+    private val beginnerStrengthB = listOf(
+        "Leg Press", "Dumbbell Pullover", "Dumbbell Shoulder Press", "Walking Lunge", "Band Face Pull", "Dead Bug", "Crosstrainer",
+    )
+    private val beginnerStrengthC = listOf(
+        "Dumbbell Deadlift", "Incline Dumbbell Press", "Chest-Supported Dumbbell Row", "Split Squat", "Farmer's Carry", "Crosstrainer",
+    )
+
+    /** The first two lifts of each strength day get a 4th set in week 5. */
+    private val beginnerMainLifts = setOf("Goblet Squat", "Dumbbell Bench Press", "Leg Press", "Dumbbell Pullover", "Dumbbell Deadlift", "Incline Dumbbell Press")
+
+    private val beginnerReps = mapOf(
+        "Goblet Squat" to 10, "Dumbbell Bench Press" to 10, "One-Arm Dumbbell Row" to 12, "Dumbbell Romanian Deadlift" to 10,
+        "Plank" to 45, "Leg Press" to 12, "Dumbbell Pullover" to 12, "Dumbbell Shoulder Press" to 10, "Walking Lunge" to 10,
+        "Band Face Pull" to 15, "Dead Bug" to 8, "Dumbbell Deadlift" to 8, "Incline Dumbbell Press" to 10,
+        "Chest-Supported Dumbbell Row" to 12, "Split Squat" to 8, "Farmer's Carry" to 30, "Side Plank" to 30, "Glute Bridge" to 15,
+        "Hip Flexor Stretch" to 45, "Thoracic Rotation" to 45, "World's Greatest Stretch" to 45,
+    )
+
+    private val beginnerRepRange = mapOf(
+        "Goblet Squat" to "8–10", "Dumbbell Bench Press" to "8–10", "One-Arm Dumbbell Row" to "10–12", "Dumbbell Romanian Deadlift" to "10",
+        "Plank" to "30–45 s", "Leg Press" to "10–12", "Dumbbell Pullover" to "10–12", "Dumbbell Shoulder Press" to "8–10",
+        "Walking Lunge" to "10 per leg", "Band Face Pull" to "15", "Dead Bug" to "8 per side", "Dumbbell Deadlift" to "6–8",
+        "Incline Dumbbell Press" to "8–10", "Chest-Supported Dumbbell Row" to "10–12", "Split Squat" to "8 per leg",
+        "Farmer's Carry" to "30 m", "Side Plank" to "20–30 s per side", "Glute Bridge" to "15",
+    )
+
+    private fun pick(week: Int, values: List<Int>) = values[(week - 1).coerceIn(0, values.size - 1)]
+
+    /** Rounds of the Monday rower intervals: 1 min hard / 1 min easy. */
+    fun beginnerRowRounds(week: Int) = pick(week, listOf(5, 6, 7, 8, 8, 6))
+
+    /** Rounds of the Friday crosstrainer intervals: 30 s hard / 90 s easy. */
+    fun beginnerCrossRounds(week: Int) = pick(week, listOf(6, 6, 8, 8, 10, 8))
+
+    private fun beginnerCardioMinutes(week: Int, day: Int, exercise: String): Int = when (day) {
+        1 -> 2 * beginnerRowRounds(week)
+        2 -> pick(week, listOf(30, 35, 40, 45, 50, 40))
+        3 -> pick(week, listOf(15, 20, 20, 20, 25, 20))
+        4 -> 10 + pick(week, listOf(20, 25, 30, 30, 35, 30))
+        5 -> 2 * beginnerCrossRounds(week)
+        6 -> if (exercise == "Crosstrainer") pick(week, listOf(25, 30, 30, 35, 35, 25)) else if (week == 1 || week == 6) 10 else pick(week, listOf(20, 20, 25, 25, 30, 20))
+        else -> 20
+    }
+
+    fun beginnerDay(week: Int, day: Int): ProgramDayPlan? = when (day) {
+        1 -> ProgramDayPlan(
+            week, day, "Strength A + rowing intervals", beginnerStrengthA, "75–85 min",
+            note = "Finisher on the rower: ${beginnerRowRounds(week)} × (1 min hard / 1 min easy). Hard is RPE 8, rate 24–28.",
+        )
+        2 -> ProgramDayPlan(
+            week, day, "Crosstrainer steady + core", listOf("Crosstrainer", "Dead Bug", "Side Plank", "Glute Bridge"), "60–70 min",
+            note = "Crosstrainer at an easy pace where you can talk in full sentences. Core circuit, 3 rounds: " +
+                "dead bug 8 per side, side plank 20–30 s per side, glute bridge 15.",
+        )
+        3 -> ProgramDayPlan(
+            week, day, "Strength B + crosstrainer steady", beginnerStrengthB, "75–85 min",
+            note = "No cable machine on board, so the dumbbell pullover replaces the lat pulldown. " +
+                "Finisher: ${beginnerCardioMinutes(week, 3, "Crosstrainer")} min easy crosstrainer.",
+        )
+        4 -> ProgramDayPlan(
+            week, day, "Rowing technique + steady row", listOf("Rowing Machine", "Hip Flexor Stretch", "Thoracic Rotation", "World's Greatest Stretch"),
+            "60–75 min",
+            note = "10 min technique drills: legs only (2 min), legs + body swing (2 min), pause at the finish (2 min), easy full strokes (4 min). " +
+                "Then ${beginnerCardioMinutes(week, 4, "Rowing Machine") - 10} min steady at rate 18–22. Damper on 3–5. Finish with 10 min mobility.",
+        )
+        5 -> ProgramDayPlan(
+            week, day, "Strength C + crosstrainer intervals", beginnerStrengthC, "75–85 min",
+            note = "Finisher on the crosstrainer: ${beginnerCrossRounds(week)} × (0:30 hard / 1:30 easy).",
+        )
+        6 -> ProgramDayPlan(
+            week, day, "Long easy cardio", listOf("Crosstrainer", "Rowing Machine"), "60–90 min",
+            note = if (week == 1 || week == 6) {
+                "Easy crosstrainer, then a 10-minute row test: row as far as you can at an even pace and note the metres."
+            } else {
+                "Crosstrainer then rower, both easy, back to back."
+            },
+        )
+        else -> null
+    }
+
+    /** One day of a calendar plan, or null on a rest day. */
+    fun calendarDay(focus: ProgramFocus, week: Int, day: Int): ProgramDayPlan? = when (focus) {
+        ProgramFocus.BEGINNER -> beginnerDay(week, day)
+        else -> onboardDay(week, day)
+    }
+
+    fun restNote(focus: ProgramFocus, day: Int): String =
+        if (focus == ProgramFocus.BEGINNER) "Rest day. Full rest or an easy 30–60 min walk." else onboardRestNote(day)
+
+    /** Rep range text shown next to the target, e.g. "8–12", for the plans that have one. */
+    fun repRange(focus: ProgramFocus, exercise: String): String? = when (focus) {
+        ProgramFocus.ONBOARD -> onboardRepRange[exercise]
+        ProgramFocus.BEGINNER -> beginnerRepRange[exercise]
+        else -> null
+    }
+
+    /** The warm-up for a plan's strength days. */
+    fun warmUp(focus: ProgramFocus): String? = when (focus) {
+        ProgramFocus.BEGINNER -> "Warm-up (10 min): 5 min easy rower or crosstrainer, 10 bodyweight squats, 10 hip hinges, " +
+            "10 arm circles each way, 10 walking lunges, then 1–2 light sets of the first exercise. Cool down with 3–5 min easy cardio and stretches."
+        else -> null
+    }
+
     fun onboardRestNote(day: Int): String =
         if (day == 4) "Rest day. Optional: 15–20 min easy crosstrainer and stretching." else "Full rest day. Sleep well."
 
-    fun isCalendarBased(focus: ProgramFocus) = focus == ProgramFocus.ONBOARD
+    fun isCalendarBased(focus: ProgramFocus) = focus == ProgramFocus.ONBOARD || focus == ProgramFocus.BEGINNER
 
-    fun isDeload(focus: ProgramFocus, week: Int) = focus != ProgramFocus.ONBOARD && week == DELOAD_WEEK
+    fun isDeload(focus: ProgramFocus, week: Int) = !isCalendarBased(focus) && week == DELOAD_WEEK
 
     fun workoutsPerWeek(focus: ProgramFocus, daysPerWeek: Int) =
-        if (focus == ProgramFocus.ONBOARD) ONBOARD_DAYS else daysPerWeek
+        when (focus) {
+            ProgramFocus.ONBOARD -> ONBOARD_DAYS
+            ProgramFocus.BEGINNER -> 6
+            else -> daysPerWeek
+        }
 
     fun templates(daysPerWeek: Int): List<Pair<String, List<String>>> = when (daysPerWeek) {
         2 -> listOf(fullBodyA, fullBodyB)
@@ -177,8 +294,8 @@ object ProgramPlanner {
 
     /** Every workout of the program in order. */
     fun plan(daysPerWeek: Int, focus: ProgramFocus = ProgramFocus.MUSCLE): List<ProgramDayPlan> {
-        if (focus == ProgramFocus.ONBOARD) {
-            return (1..WEEKS).flatMap { week -> (1..7).mapNotNull { day -> onboardDay(week, day) } }
+        if (isCalendarBased(focus)) {
+            return (1..WEEKS).flatMap { week -> (1..7).mapNotNull { day -> calendarDay(focus, week, day) } }
         }
         val days = templates(daysPerWeek)
         return (1..WEEKS).flatMap { week ->
@@ -192,6 +309,14 @@ object ProgramPlanner {
             3, 4 -> WeekScheme(3, 12, 1.0, 1.0, "Build: moderate, 2–3 reps left. Add weight each week.", "Build")
             5 -> WeekScheme(3, 12, 1.0, 1.0, "Push: hard, 1–2 reps left. Beat your week 4 numbers.", "Push")
             else -> WeekScheme(4, 12, 1.0, 1.0, "Push: hard, 1–2 reps left. Never to failure on a moving ship.", "Push")
+        }
+        ProgramFocus.BEGINNER -> when (week) {
+            1 -> WeekScheme(2, 10, 1.0, 1.0, "Learn the form: RPE 6, you could do 4 more reps.", "Learn")
+            2 -> WeekScheme(3, 10, 1.0, 1.0, "RPE 6–7: stop with 3–4 reps left.", "Build")
+            3 -> WeekScheme(3, 10, 1.0, 1.0, "RPE 7 and add weight where you hit the top of the range.", "Build")
+            4 -> WeekScheme(3, 10, 1.0, 1.0, "RPE 7–8: 2–3 reps left.", "Build")
+            5 -> WeekScheme(3, 10, 1.0, 1.0, "Hardest week: 4 sets on the first two lifts, RPE 8.", "Push")
+            else -> WeekScheme(3, 10, 1.0, 1.0, "Ease off: RPE 7, keep your week 5 weights, then retest.", "Retest")
         }
         ProgramFocus.STRENGTH -> when (week) {
             1 -> WeekScheme(3, 8, 0.90, 1.0, "Learn the rhythm. Leave 2 to 3 reps in the tank.")
@@ -228,8 +353,19 @@ object ProgramPlanner {
         base: Prescription,
         exerciseName: String = "",
         weightStepKg: Double = Coach.WEIGHT_STEP_KG,
+        /** Day of a calendar plan; cardio minutes depend on it. */
+        day: Int = 0,
     ): Prescription {
         val s = scheme(focus, week)
+        if (focus == ProgramFocus.BEGINNER) {
+            return if (isCardio) {
+                base.copy(sets = 1, reps = beginnerCardioMinutes(week, day, exerciseName))
+            } else {
+                val sets = if (week == 5 && exerciseName in beginnerMainLifts) 4 else s.sets
+                // Weight stays the coach's; reps sit at the top of the range so hitting them earns more weight.
+                base.copy(sets = sets, reps = beginnerReps[exerciseName] ?: base.reps)
+            }
+        }
         if (focus == ProgramFocus.ONBOARD) {
             return when {
                 isCardio -> base.copy(

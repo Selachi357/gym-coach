@@ -236,6 +236,35 @@ object SeedExercises {
             harderName = "Romanian Deadlift", startWeightKg = 12.0, startReps = 12,
         ),
         Exercise(
+            name = "Dumbbell Deadlift", muscleGroup = "Legs", equipment = "Dumbbells", isBodyweight = false,
+            instructions = """
+                Stand with a dumbbell on each side of your feet, feet hip-width apart.
+                Push your hips back and bend your knees to grip the dumbbells, back flat and chest up.
+                Brace your stomach, then stand up by pushing the floor away, dumbbells close to your legs.
+                Lower them the same way, hips back first, until they touch the floor.
+            """.trimIndent(),
+            tips = """
+                Weight is per dumbbell.
+                Mistake: rounding your back to reach the floor. Bend your knees more instead.
+                Rest 2 minutes between sets: it is the heaviest lift of the day.
+            """.trimIndent(),
+            easierName = "Dumbbell Romanian Deadlift", harderName = "Deadlift", startWeightKg = 16.0, startReps = 8,
+        ),
+        Exercise(
+            name = "Farmer's Carry", muscleGroup = "Full body", equipment = "Dumbbells", isBodyweight = false,
+            instructions = """
+                Pick up a heavy dumbbell in each hand the way you would deadlift them.
+                Stand tall, shoulders down and back, stomach tight.
+                Walk about 30 m with short, steady steps, then put them down carefully.
+                Log the seconds you walked; about 30 seconds is 30 m.
+            """.trimIndent(),
+            tips = """
+                Weight is per dumbbell. Go heavy enough that your grip works hard.
+                On a rolling ship, walk slowly and keep a hand free to grab something if you need to.
+            """.trimIndent(),
+            startWeightKg = 16.0, startReps = 30,
+        ),
+        Exercise(
             name = "Deadlift", muscleGroup = "Legs", equipment = "Barbell", isBodyweight = false,
             instructions = """
                 Stand with the bar over the middle of your feet.
@@ -438,6 +467,33 @@ object SeedExercises {
             """.trimIndent(),
             easierName = "Dead Bug", startReps = 20,
         ),
+        Exercise(
+            name = "Side Plank", muscleGroup = "Core", equipment = "Bodyweight", isBodyweight = true,
+            instructions = """
+                Lie on your side, elbow under your shoulder, legs straight and stacked.
+                Lift your hips until your body is a straight line from head to feet.
+                Hold, then switch sides. Log the seconds per side.
+            """.trimIndent(),
+            tips = """
+                Don't let your hips sag or roll forward.
+                Too hard? Bend your knees and rest on them.
+            """.trimIndent(),
+            easierName = "Dead Bug", startReps = 20,
+        ),
+        Exercise(
+            name = "Band Face Pull", muscleGroup = "Shoulders", equipment = "Resistance band", isBodyweight = true,
+            instructions = """
+                Tie a resistance band at face height, or hold it in both hands with your arms straight out in front.
+                Pull the band towards your face, elbows high and out to the sides.
+                Finish with your hands beside your ears, squeezing your shoulder blades together.
+                Return slowly.
+            """.trimIndent(),
+            tips = """
+                Light and controlled: this is for healthy shoulders, not heavy weight.
+                No band? Do lateral raises with light dumbbells instead.
+            """.trimIndent(),
+            startReps = 15, startSets = 2,
+        ),
         // Mobility: timed holds, logged in seconds. They train AGI in the hero game.
         Exercise(
             name = "Deep Squat Hold", muscleGroup = "Mobility", equipment = "Bodyweight", isBodyweight = true,
@@ -591,7 +647,7 @@ object SeedExercises {
 
     /** Holds that log seconds instead of reps. */
     val TIMED = setOf(
-        "Plank", "Deep Squat Hold", "World's Greatest Stretch", "Couch Stretch", "Thoracic Rotation",
+        "Plank", "Side Plank", "Farmer's Carry", "Deep Squat Hold", "World's Greatest Stretch", "Couch Stretch", "Thoracic Rotation",
         "Hip Flexor Stretch", "Shoulder Dislocates",
     )
 }

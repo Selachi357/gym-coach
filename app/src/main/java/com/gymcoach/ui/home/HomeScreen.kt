@@ -68,6 +68,7 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item { com.gymcoach.ui.hero.HeroBanner(onClick = openHero) }
+            item { TodayCard(program = program, openWorkout = openWorkout, openProgram = openProgram) }
             item {
                 RetroCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                     Column(Modifier.fillMaxWidth().padding(20.dp)) {
@@ -181,7 +182,7 @@ private fun ProgramHomeCard(
             val (title, detail) = when (status) {
                 is com.gymcoach.data.ProgramStatus.Next ->
                     "Week ${status.plan.week} of 6 · ${status.plan.name}" to
-                        (if (status.plan.duration.isNotEmpty()) "Today's exercises · ${status.plan.duration}" else "Today's exercises")
+                        "Today's exercises are at the top of this screen."
                 is com.gymcoach.data.ProgramStatus.DoneToday ->
                     "Week ${status.plan.week} of 6 · done for today" to "${status.plan.name} is logged. Recover well."
                 is com.gymcoach.data.ProgramStatus.Rest -> "Week ${status.week} of 6 · rest day" to status.note
@@ -192,24 +193,6 @@ private fun ProgramHomeCard(
             }
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(detail, style = MaterialTheme.typography.bodySmall)
-            val today = when (status) {
-                is com.gymcoach.data.ProgramStatus.Next -> status.plan
-                is com.gymcoach.data.ProgramStatus.DoneToday -> status.plan
-                else -> null
-            }
-            if (today != null) {
-                val ticks by androidx.compose.runtime.remember(program.id) { repo.programTicks(program.id) }
-                    .collectAsStateWithLifecycle(initialValue = com.gymcoach.data.ProgramTicks())
-                Spacer(Modifier.size(8.dp))
-                com.gymcoach.ui.program.DayChecklist(
-                    program = program,
-                    day = today,
-                    date = null,
-                    finished = status is com.gymcoach.data.ProgramStatus.DoneToday,
-                    ticks = ticks,
-                    showHeader = false,
-                )
-            }
             Spacer(Modifier.size(8.dp))
             LinearProgressIndicator(
                 progress = { (finished.size.toFloat() / total).coerceIn(0f, 1f) },
@@ -217,12 +200,100 @@ private fun ProgramHomeCard(
             )
             Text("${finished.size} of $total workouts done", style = MaterialTheme.typography.labelMedium)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (next != null && !hasActiveSession) {
-                    RetroButton(onClick = onStart) { Text("Start today's workout") }
-                }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = openProgram) { Text("View plan") }
             }
         }
+    }
+}
+
+private val todayFormat = java.time.format.DateTimeFormatter.ofPattern("EEE d MMM")
+
+/**
+ * Today's exercises, ready when the app opens. Ticking one makes the coach log it as planned;
+ * unticking takes it back while the workout is still open.
+ */
+@Composable
+private fun TodayCard(program: com.gymcoach.data.Program?, openWorkout: (Long) -> Unit, openProgram: () -> Unit) {
+    val repo = LocalRepository.current
+    val scope = rememberCoroutineScope()
+    val finished by androidx.compose.runtime.remember(program?.id) {
+        program?.let { repo.finishedProgramSessions(it.id) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
+    }.collectAsStateWithLifecycle(initialValue = emptyList())
+    val logged by androidx.compose.runtime.remember { repo.loggedToday() }.collectAsStateWithLifecycle(initialValue = emptySet())
+    val active by repo.activeSession.collectAsStateWithLifecycle(initialValue = null)
+    val plan = repo.todayPlan(program, finished)
+    val day = plan.day
+    val openToday = active?.takeIf { it.startedAt >= com.gymcoach.data.GymRepository.startOfDay() }
+    var note by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    var coach by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<List<String>?>(null) }
+
+    RetroCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                "TODAY · ${java.time.LocalDate.now().format(todayFormat).uppercase()}",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            if (day == null) {
+                Text("Rest day", style = MaterialTheme.typography.titleLarge)
+                Text(plan.rest ?: "Recover well.", style = MaterialTheme.typography.bodyMedium)
+                return@Column
+            }
+            Text(day.name, style = MaterialTheme.typography.titleLarge)
+            Text(
+                (if (plan.fromProgram) "Week ${day.week} of 6 · ${plan.focus.label}" else "Coach's pick from your beginner plan") +
+                    if (day.duration.isNotEmpty()) " · ${day.duration}" else "",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            com.gymcoach.ui.program.DayChecklist(
+                focus = plan.focus,
+                day = day,
+                date = null,
+                finished = false,
+                checked = { it in logged },
+                logged = { false },
+                onToggle = { name ->
+                    scope.launch {
+                        note = null
+                        if (name in logged) {
+                            if (!repo.unlogToday(name)) note = "Today's workout is already saved. Change it in the Log tab."
+                        } else {
+                            repo.logPlanned(plan, name)
+                        }
+                    }
+                },
+                showHeader = false,
+            )
+            Text(
+                "Tick an exercise and the coach logs every set as planned, rated 7 out of 10. Open the workout to change weights or reps.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            note?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                RetroButton(onClick = { scope.launch { repo.startToday(plan)?.let(openWorkout) } }) {
+                    Text(if (openToday != null) "Open workout" else "Start")
+                }
+                if (openToday != null && day.exercises.any { it in logged }) {
+                    com.gymcoach.ui.theme.RetroOutlinedButton(onClick = {
+                        scope.launch { coach = repo.finishSession(openToday.id) }
+                    }) { Text("Finish") }
+                }
+                Spacer(Modifier.weight(1f))
+                if (!plan.fromProgram) TextButton(onClick = openProgram) { Text("Plans") }
+            }
+        }
+    }
+
+    coach?.let { messages ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { coach = null },
+            title = { Text("Coach") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { messages.forEach { Text(it) } }
+            },
+            confirmButton = { TextButton(onClick = { coach = null }) { Text("OK") } },
+        )
     }
 }
